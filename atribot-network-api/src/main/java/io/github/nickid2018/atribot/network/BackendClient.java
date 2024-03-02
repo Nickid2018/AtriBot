@@ -77,7 +77,6 @@ public class BackendClient {
 
         @Override
         public void connectionOpened(Connection connection) {
-            active = true;
         }
 
         @Override
@@ -101,16 +100,19 @@ public class BackendClient {
                     connection.getChannel().pipeline().addBefore("prepender", "encrypt", new CipherEncoder(key));
                     encrypted = true;
                 });
-            } else if (msg instanceof ConnectionSuccessPacket)
+            } else if (msg instanceof ConnectionSuccessPacket) {
+                active = true;
                 listener.connectionOpened(connection);
-            else
+            } else
                 listener.receivePacket(connection, msg);
         }
 
         @Override
         public void connectionClosed(Connection connection) {
-            active = false;
-            listener.connectionClosed(connection);
+            if (active) {
+                active = false;
+                listener.connectionClosed(connection);
+            }
         }
 
         @Override

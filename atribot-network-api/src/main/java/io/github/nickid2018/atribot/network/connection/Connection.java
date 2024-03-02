@@ -70,7 +70,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Packet msg) {
         if (NETWORK_LOGGER.isDebugEnabled())
-            NETWORK_LOGGER.debug(NETWORK_MARKER, "Received packet: {}", msg.getClass().getSimpleName());
+            NETWORK_LOGGER.debug(NETWORK_MARKER, "Received packet: {}, hash = {}", msg.getClass().getSimpleName(), msg.hashCode());
         listener.receivePacket(this, msg);
     }
 
@@ -109,15 +109,15 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
         sendPacket(packet, null);
     }
 
-    public void sendPacket(Packet packet, GenericFutureListener<? extends Future<? super Void>> listener) {
+    public void sendPacket(Packet msg, GenericFutureListener<? extends Future<? super Void>> listener) {
         if (NETWORK_LOGGER.isDebugEnabled())
-            NETWORK_LOGGER.debug(NETWORK_MARKER, "Sending or pushing packet: {}", packet.getClass().getSimpleName());
+            NETWORK_LOGGER.debug(NETWORK_MARKER, "Sending or pushing packet: {}, hash = {}", msg.getClass().getSimpleName(), msg.hashCode());
         if (isNotActive()) {
-            PacketHolder holder = new PacketHolder(packet, listener);
+            PacketHolder holder = new PacketHolder(msg, listener);
             packetBuffer.offer(holder);
         } else {
             flushQueue();
-            sendPacket0(packet, listener);
+            sendPacket0(msg, listener);
         }
     }
 
