@@ -1,6 +1,7 @@
 package io.github.nickid2018.atribot.network.connection;
 
 import io.github.nickid2018.atribot.network.packet.Packet;
+import io.netty.handler.codec.DecoderException;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -19,7 +20,7 @@ public class PacketRegistry {
     private final IntSet clientSidePackets = new IntOpenHashSet();
     private final AtomicInteger idCounter = new AtomicInteger(0);
 
-    public <T extends Packet> int registerPacket(Class<T> packetClass, Supplier<T> supplier, boolean serverSide, boolean clientSide) {
+    public <T extends Packet> void registerPacket(Class<T> packetClass, Supplier<T> supplier, boolean serverSide, boolean clientSide) {
         int id = idCounter.getAndIncrement();
         packetCreationRegistry.put(id, supplier);
         packetSerializeRegistry.put(packetClass, id);
@@ -27,7 +28,6 @@ public class PacketRegistry {
             serverSidePackets.add(id);
         if (clientSide)
             clientSidePackets.add(id);
-        return id;
     }
 
     public int getPacketId(Packet packet) {
@@ -36,14 +36,14 @@ public class PacketRegistry {
 
     public Packet createPacket(int id, boolean serverSide) {
         if (!packetCreationRegistry.containsKey(id))
-            throw new IllegalArgumentException("Unknown packet id: " + id);
+            throw new DecoderException("Unknown packet id: " + id);
         if (serverSide && !serverSidePackets.contains(id))
-            throw new IllegalArgumentException(
-                    "Packet id %d is not server side packet"
+            throw new DecoderException(
+                    "Packet id %d is not server side packet".formatted(id)
             );
         if (!serverSide && !clientSidePackets.contains(id))
-            throw new IllegalArgumentException(
-                    "Packet id %d is not client side packet"
+            throw new DecoderException(
+                    "Packet id %d is not client side packet".formatted(id)
             );
         return packetCreationRegistry.get(id).get();
     }

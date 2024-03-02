@@ -13,6 +13,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 public class PacketBuffer extends ByteBuf {
 
@@ -51,6 +52,31 @@ public class PacketBuffer extends ByteBuf {
                 return b;
         }
         return 5;
+    }
+
+    public void writeString(String paramString) {
+        byte[] arrayOfByte = paramString.getBytes(StandardCharsets.UTF_8);
+        writeVarInt(arrayOfByte.length);
+        writeBytes(arrayOfByte);
+    }
+
+    public String readString() {
+        int i = readVarInt();
+        byte[] arrayOfByte = new byte[i];
+        readBytes(arrayOfByte);
+        return new String(arrayOfByte, StandardCharsets.UTF_8);
+    }
+
+    public void writeByteArray(byte[] paramArrayOfbyte) {
+        writeVarInt(paramArrayOfbyte.length);
+        writeBytes(paramArrayOfbyte);
+    }
+
+    public byte[] readByteArray() {
+        int i = readVarInt();
+        byte[] arrayOfByte = new byte[i];
+        readBytes(arrayOfByte);
+        return arrayOfByte;
     }
 
     // Override all methods from ByteBuf -------------------------------------------------------------------------------

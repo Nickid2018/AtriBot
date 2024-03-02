@@ -1,9 +1,16 @@
 package io.github.nickid2018.atribot.network;
 
-import io.github.nickid2018.atribot.network.connection.*;
+import io.github.nickid2018.atribot.network.connection.CipherDecoder;
+import io.github.nickid2018.atribot.network.connection.CipherEncoder;
+import io.github.nickid2018.atribot.network.connection.Connection;
+import io.github.nickid2018.atribot.network.connection.PacketRegistry;
 import io.github.nickid2018.atribot.network.listener.NetworkListener;
-import io.github.nickid2018.atribot.network.packet.KeepAlivePacket;
 import io.github.nickid2018.atribot.network.packet.Packet;
+import io.github.nickid2018.atribot.network.packet.common.ConnectionSuccessPacket;
+import io.github.nickid2018.atribot.network.packet.common.EncryptionProgressPacket;
+import io.github.nickid2018.atribot.network.packet.common.EncryptionStartPacket;
+import io.github.nickid2018.atribot.network.packet.common.KeepAlivePacket;
+import io.github.nickid2018.atribot.util.CipherHelper;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -12,11 +19,15 @@ import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
+import javax.crypto.SecretKey;
 import java.net.InetAddress;
+import java.security.PublicKey;
 import java.util.function.Supplier;
 
 @Getter
+@Slf4j
 public class BackendClient {
 
     private final Connection connection;
@@ -24,18 +35,20 @@ public class BackendClient {
     private final PacketRegistry registry;
 
     private volatile boolean active;
+    private volatile boolean encrypted;
 
     public BackendClient(NetworkListener listener) {
         this.listener = listener;
         registry = new PacketRegistry();
         registry.registerPacket(KeepAlivePacket.class, KeepAlivePacket::new, true, true);
+        registry.registerPacket(EncryptionStartPacket.class, EncryptionStartPacket::new, true, false);
+        registry.registerPacket(EncryptionProgressPacket.class, EncryptionProgressPacket::new, false, true);
+        registry.registerPacket(ConnectionSuccessPacket.class, ConnectionSuccessPacket::new, true, false);
         connection = new Connection(new DelegateListener(), registry, false);
     }
 
-    public <T extends Packet> void addPacket(Class<T> packetClass, Supplier<T> supplier) {
-        if (active)
-            return;
-        registry.registerPacket(packetClass, supplier, false, true);
+    public <T extends Packet> void addPacket(Class<T> packetClass, Supplier<T> supplier, boolean serverSide, boolean clientSide) {
+        registry.registerPacket(packetClass, supplier, serverSide, clientSide);
     }
 
     public void connect(InetAddress addr, int port) {
@@ -65,13 +78,31 @@ public class BackendClient {
         @Override
         public void connectionOpened(Connection connection) {
             active = true;
-            listener.connectionOpened(connection);
         }
 
         @Override
         public void receivePacket(Connection connection, Packet msg) {
             if (msg instanceof KeepAlivePacket)
                 connection.sendPacket(msg);
+            else if (msg instanceof EncryptionStartPacket encryptionStartPacket) {
+                if (encrypted) {
+                    log.warn("Received encryption start packet after encryption started, disconnecting...");
+                    connection.disconnect();
+                    return;
+                }
+                SecretKey key = CipherHelper.generateSecretKey();
+                byte[] challenge = encryptionStartPacket.getChallenge();
+                byte[] serverPublicKey = encryptionStartPacket.getPublicKey();
+                PublicKey publicKey = CipherHelper.decodePublicKey(serverPublicKey);
+                byte[] encryptedChallenge = CipherHelper.encrypt(challenge, publicKey);
+                byte[] encryptedKey = CipherHelper.encrypt(key.getEncoded(), publicKey);
+                connection.sendPacket(new EncryptionProgressPacket(encryptedKey, encryptedChallenge), v -> {
+                    connection.getChannel().pipeline().addBefore("splitter", "decrypt", new CipherDecoder(key));
+                    connection.getChannel().pipeline().addBefore("prepender", "encrypt", new CipherEncoder(key));
+                    encrypted = true;
+                });
+            } else if (msg instanceof ConnectionSuccessPacket)
+                listener.connectionOpened(connection);
             else
                 listener.receivePacket(connection, msg);
         }

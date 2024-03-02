@@ -4,21 +4,20 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.nickid2018.atribot.network.listener.NetworkListener;
 import io.github.nickid2018.atribot.network.packet.Packet;
 import io.github.nickid2018.atribot.util.LazyLoadedValue;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
-import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.CodecException;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.TimeoutException;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
-import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -26,18 +25,19 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class Connection extends SimpleChannelInboundHandler<Packet> {
 
     public static final LazyLoadedValue<NioEventLoopGroup> SERVER_EVENT_GROUP = new LazyLoadedValue<>(
-            () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Server IO #%d").build()));
+            () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Server IO #%d").setDaemon(true).build()));
 
     public static final LazyLoadedValue<EpollEventLoopGroup> SERVER_EPOLL_EVENT_GROUP = new LazyLoadedValue<>(
-            () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Server IO #%d").build()));
+            () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Server IO #%d").setDaemon(true).build()));
 
     public static final LazyLoadedValue<NioEventLoopGroup> NETWORK_WORKER_GROUP = new LazyLoadedValue<>(
-            () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Client IO #%d").build()));
+            () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Client IO #%d").setDaemon(true).build()));
 
     public static final LazyLoadedValue<EpollEventLoopGroup> NETWORK_EPOLL_WORKER_GROUP = new LazyLoadedValue<>(
-            () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Client IO #%d").build()));
+            () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Client IO #%d").setDaemon(true).build()));
 
     public static final Logger NETWORK_LOGGER = LoggerFactory.getLogger("Network");
+    public static final Marker NETWORK_MARKER = MarkerFactory.getMarker("ATRIBOT_NETWORK");
 
     @Getter
     private Channel channel;
@@ -50,12 +50,12 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
     @Getter
     private final PacketRegistry registry;
     @Getter
-    private final boolean isServerSide;
+    private final boolean receiveFromServerSide;
 
     public Connection(NetworkListener listener, PacketRegistry registry, boolean isServerSide) {
         this.listener = listener;
         this.registry = registry;
-        this.isServerSide = isServerSide;
+        this.receiveFromServerSide = !isServerSide;
     }
 
     @Override
@@ -69,6 +69,8 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Packet msg) {
+        if (NETWORK_LOGGER.isDebugEnabled())
+            NETWORK_LOGGER.debug(NETWORK_MARKER, "Received packet: {}", msg.getClass().getSimpleName());
         listener.receivePacket(this, msg);
     }
 
@@ -77,15 +79,15 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
         if (!channel.isOpen())
             return;
         if (cause instanceof TimeoutException) {
-            NETWORK_LOGGER.error("A client met a timeout", cause);
+            NETWORK_LOGGER.error(NETWORK_MARKER, "A client met a timeout", cause);
             channel.close().syncUninterruptibly();
             listener.fatalError(this, cause);
-        } else if (cause instanceof ChannelException) {
-            NETWORK_LOGGER.error("Fatal error in sending/receiving packet", cause);
+        } else if (cause instanceof ChannelException || cause instanceof CodecException) {
+            NETWORK_LOGGER.error(NETWORK_MARKER, "Fatal error in sending/receiving packet", cause);
             channel.close().syncUninterruptibly();
             listener.fatalError(this, cause);
         } else {
-            NETWORK_LOGGER.warn("An exception caught in channel", cause);
+            NETWORK_LOGGER.warn(NETWORK_MARKER, "An exception caught in channel", cause);
             listener.exceptionCaught(this, cause);
         }
     }
@@ -99,7 +101,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
     }
 
     public void disconnect() {
-        if (channel.isOpen())
+        if (!isNotActive())
             channel.close().syncUninterruptibly();
     }
 
@@ -108,6 +110,8 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
     }
 
     public void sendPacket(Packet packet, GenericFutureListener<? extends Future<? super Void>> listener) {
+        if (NETWORK_LOGGER.isDebugEnabled())
+            NETWORK_LOGGER.debug(NETWORK_MARKER, "Sending or pushing packet: {}", packet.getClass().getSimpleName());
         if (isNotActive()) {
             PacketHolder holder = new PacketHolder(packet, listener);
             packetBuffer.offer(holder);
@@ -155,8 +159,8 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
 
     public static void setupChannel(Channel channel, Connection connection) {
         channel.config().setOption(ChannelOption.TCP_NODELAY, true);
-        channel.config().setOption(ChannelOption.SO_TIMEOUT, 30000);
         channel.pipeline()
+                .addLast("timeout", new ReadTimeoutHandler(30))
                 .addLast("splitter", new SplitterHandler())
                 .addLast("decoder", new PacketDecoder(connection))
                 .addLast("prepender", new SizePrepender())

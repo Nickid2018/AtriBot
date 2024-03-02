@@ -1,5 +1,7 @@
-package io.github.nickid2018.atribot.network.packet;
+package io.github.nickid2018.atribot.network.packet.common;
 
+import io.github.nickid2018.atribot.network.packet.Packet;
+import io.github.nickid2018.atribot.network.packet.PacketBuffer;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

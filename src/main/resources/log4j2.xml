@@ -3,12 +3,17 @@
 	<Appenders>
 		<Console name="SysOut" target="SYSTEM_OUT">
 			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
-			<ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+			<Filters>
+				<NoMarkerFilter onMatch="ACCEPT" onMismatch="DENY"/>
+				<ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+			</Filters>
 		</Console>
-		<RollingRandomAccessFile name="File" fileName="logs/latest.log"
-		                         filePattern="monitor-logs/%d{yyyy-MM-dd}-%i.log.gz">
+		<RollingRandomAccessFile name="File" fileName="logs/latest.log" filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
 			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
-			<ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+			<Filters>
+				<NoMarkerFilter onMatch="ACCEPT" onMismatch="DENY"/>
+				<ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+			</Filters>
 			<Policies>
 				<TimeBasedTriggeringPolicy/>
 				<OnStartupTriggeringPolicy/>
@@ -16,11 +21,20 @@
 			</Policies>
 			<DefaultRolloverStrategy max="50"/>
 		</RollingRandomAccessFile>
+		<File name="NetworkLog" fileName="logs/network.log" append="false">
+			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
+			<Filters>
+				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="ACCEPT" onMismatch="DENY"/>
+				<ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+			</Filters>
+		</File>
 	</Appenders>
 	<Loggers>
+		<Logger name="io.netty" level="ERROR"/>
 		<Root level="DEBUG">
 			<AppenderRef ref="SysOut"/>
 			<AppenderRef ref="File"/>
+			<AppenderRef ref="NetworkLog"/>
 		</Root>
 	</Loggers>
 </Configuration>
