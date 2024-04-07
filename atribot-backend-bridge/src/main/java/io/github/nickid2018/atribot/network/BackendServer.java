@@ -33,7 +33,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 @Slf4j
-public class BackendServer {
+public class BackendServer implements PacketRegister {
 
     private final Supplier<NetworkListener> listenerSupplier;
     private final PacketRegistry registry;
@@ -50,10 +50,7 @@ public class BackendServer {
         this.listenerSupplier = listenerSupplier;
 
         registry = new PacketRegistry();
-        registry.registerPacket(KeepAlivePacket.class, KeepAlivePacket::new, true, true);
-        registry.registerPacket(EncryptionStartPacket.class, EncryptionStartPacket::new, true, false);
-        registry.registerPacket(EncryptionProgressPacket.class, EncryptionProgressPacket::new, false, true);
-        registry.registerPacket(ConnectionSuccessPacket.class, ConnectionSuccessPacket::new, true, false);
+        PacketRegister.registerBasicPackets(this);
 
         keepAliveThread = new Thread(this::keepAlive, "Backend Server Keep Alive");
         keepAliveThread.setDaemon(true);

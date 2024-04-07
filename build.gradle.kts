@@ -23,10 +23,11 @@ dependencies {
     api("org.apache.httpcomponents.client5:httpclient5:5.3.1")
     api("com.google.guava:guava:33.0.0-jre")
     api("it.unimi.dsi:fastutil:8.5.13")
+    api("org.snakeyaml:snakeyaml-engine:2.7")
 
     // Lombok
-    compileOnlyApi("org.projectlombok:lombok:1.18.30")
-    annotationProcessor("org.projectlombok:lombok:1.18.30")
-    testCompileOnly("org.projectlombok:lombok:1.18.30")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.30")
+    compileOnlyApi("org.projectlombok:lombok:1.18.32")
+    annotationProcessor("org.projectlombok:lombok:1.18.32")
+    testCompileOnly("org.projectlombok:lombok:1.18.32")
+    testAnnotationProcessor("org.projectlombok:lombok:1.18.32")
 }

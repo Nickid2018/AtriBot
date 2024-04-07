@@ -1,9 +1,9 @@
 package io.github.nickid2018.atribot.network.connection;
 
+import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.nickid2018.atribot.network.listener.NetworkListener;
 import io.github.nickid2018.atribot.network.packet.Packet;
-import io.github.nickid2018.atribot.util.LazyLoadedValue;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -21,19 +21,20 @@ import org.slf4j.MarkerFactory;
 import java.net.SocketAddress;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Supplier;
 
 public class Connection extends SimpleChannelInboundHandler<Packet> {
 
-    public static final LazyLoadedValue<NioEventLoopGroup> SERVER_EVENT_GROUP = new LazyLoadedValue<>(
+    public static final Supplier<NioEventLoopGroup> SERVER_EVENT_GROUP = Suppliers.memoize(
             () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Server IO #%d").setDaemon(true).build()));
 
-    public static final LazyLoadedValue<EpollEventLoopGroup> SERVER_EPOLL_EVENT_GROUP = new LazyLoadedValue<>(
+    public static final Supplier<EpollEventLoopGroup> SERVER_EPOLL_EVENT_GROUP = Suppliers.memoize(
             () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Server IO #%d").setDaemon(true).build()));
 
-    public static final LazyLoadedValue<NioEventLoopGroup> NETWORK_WORKER_GROUP = new LazyLoadedValue<>(
+    public static final Supplier<NioEventLoopGroup> NETWORK_WORKER_GROUP = Suppliers.memoize(
             () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Client IO #%d").setDaemon(true).build()));
 
-    public static final LazyLoadedValue<EpollEventLoopGroup> NETWORK_EPOLL_WORKER_GROUP = new LazyLoadedValue<>(
+    public static final Supplier<EpollEventLoopGroup> NETWORK_EPOLL_WORKER_GROUP = Suppliers.memoize(
             () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Client IO #%d").setDaemon(true).build()));
 
     public static final Logger NETWORK_LOGGER = LoggerFactory.getLogger("Network");

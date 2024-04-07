@@ -28,7 +28,7 @@ import java.util.function.Supplier;
 
 @Getter
 @Slf4j
-public class BackendClient {
+public class BackendClient implements PacketRegister {
 
     private final Connection connection;
     private final NetworkListener listener;
@@ -40,10 +40,7 @@ public class BackendClient {
     public BackendClient(NetworkListener listener) {
         this.listener = listener;
         registry = new PacketRegistry();
-        registry.registerPacket(KeepAlivePacket.class, KeepAlivePacket::new, true, true);
-        registry.registerPacket(EncryptionStartPacket.class, EncryptionStartPacket::new, true, false);
-        registry.registerPacket(EncryptionProgressPacket.class, EncryptionProgressPacket::new, false, true);
-        registry.registerPacket(ConnectionSuccessPacket.class, ConnectionSuccessPacket::new, true, false);
+        PacketRegister.registerBasicPackets(this);
         connection = new Connection(new DelegateListener(), registry, false);
     }
 
@@ -85,7 +82,7 @@ public class BackendClient {
                 connection.sendPacket(msg);
             else if (msg instanceof EncryptionStartPacket encryptionStartPacket) {
                 if (encrypted) {
-                    log.warn("Received encryption start packet after encryption started, disconnecting...");
+                    listener.fatalError(connection, new IllegalStateException("Received encryption start packet after encryption started"));
                     connection.disconnect();
                     return;
                 }

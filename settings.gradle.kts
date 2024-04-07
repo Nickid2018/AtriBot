@@ -6,9 +6,9 @@ fun includeProject(name: String) {
 rootProject.name = "AtriBot"
 
 includeProject("atribot-core") // Core module
-includeProject("atribot-plugin-api") // Plugin API
-includeProject("atribot-network-api") // Network API
+includeProject("atribot-backend-bridge") // Backend Bridge
 
 // Plugins Here
 
 // Backends Here
+includeProject("atribot-backend-console") // Test Console Backend

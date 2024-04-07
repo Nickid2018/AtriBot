@@ -4,17 +4,15 @@ plugins {
 }
 
 group = "io.github.nickid2018"
-version = "1.0-SNAPSHOT"
+version = "1.0"
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-   api(project(":atribot-backend-bridge"))
-
-    api("com.j256.ormlite:ormlite-jdbc:6.1")
-    implementation("org.xerial:sqlite-jdbc:3.45.1.0")
+    api(rootProject)
+    api("io.netty:netty-all:4.1.107.Final")
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
