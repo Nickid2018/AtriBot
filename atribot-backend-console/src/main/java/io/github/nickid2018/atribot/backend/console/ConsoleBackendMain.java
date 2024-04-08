@@ -9,10 +9,12 @@ import io.github.nickid2018.atribot.network.message.TransactionQueue;
 import io.github.nickid2018.atribot.network.packet.backend.MessagePacket;
 import io.github.nickid2018.atribot.util.Configuration;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 import java.net.InetAddress;
 import java.util.Scanner;
 
+@Slf4j
 public class ConsoleBackendMain {
 
     @SneakyThrows
@@ -23,6 +25,7 @@ public class ConsoleBackendMain {
         BackendClient client = new BackendClient(listener);
         listener.setTransactionQueue(new TransactionQueue(client.getConnection()));
         PacketRegister.registerBackendPackets(client);
+        client.setAutoReconnect(true);
         client.connect(
                 InetAddress.getByName(Configuration.getStringOrElse("network.host", "localhost")),
                 Configuration.getIntOrElse("network.port", 11451)

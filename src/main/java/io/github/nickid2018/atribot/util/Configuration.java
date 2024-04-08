@@ -37,7 +37,7 @@ public class Configuration {
             System.exit(1);
         }
 
-        log.info("Using configuration file: " + choose.getName());
+        log.info("Using configuration file: {}", choose.getName());
         try (FileReader reader = new FileReader(choose)) {
             config = (Map<String, Object>) YAML_LOADER.loadFromReader(reader);
         } catch (Exception e) {

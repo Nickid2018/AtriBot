@@ -7,14 +7,10 @@ import io.github.nickid2018.atribot.network.packet.backend.BackendBasicInformati
 import io.github.nickid2018.atribot.network.packet.backend.MessagePacket;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashSet;
-import java.util.Set;
-
 @Slf4j
 public class MessageBackendListener implements NetworkListener {
 
     private MessageManager manager;
-    private final Set<String> cachedIds = new HashSet<>();
 
     public MessageBackendListener(MessageManager manager) {
         this.manager = manager;
@@ -31,9 +27,7 @@ public class MessageBackendListener implements NetworkListener {
                 log.info("Backend connected: {} {}", packet.getIdentifier(), packet.getVersion());
                 log.debug("Backend information: {} => {}", packet.getIdentifier(), packet.getExternalInformation());
             }
-            case MessagePacket packet -> {
-                connection.sendPacket(packet);
-            }
+            case MessagePacket packet -> manager.handleMessage(packet.getTargetData(), packet.getMessageChain());
             default -> throw new IllegalStateException("Unexpected value: " + msg);
         }
     }

@@ -35,6 +35,7 @@ public class ConsoleBackendListener implements NetworkListener {
                         "prefixCommand", ""
                 )
         ));
+        log.info("Connection opened.");
     }
 
     @Override

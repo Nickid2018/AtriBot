@@ -1,6 +1,8 @@
 package io.github.nickid2018.atribot.core.message;
 
 import com.j256.ormlite.dao.Dao;
+import io.github.nickid2018.atribot.network.message.MessageChain;
+import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.util.Configuration;
 import io.github.nickid2018.atribot.core.database.DatabaseManager;
 import io.github.nickid2018.atribot.core.message.persist.IdBackendMapping;
@@ -45,5 +47,9 @@ public class MessageManager {
             log.error("Error closing Message Queue Database", e);
         }
         log.info("Backend Server stopped");
+    }
+
+    public void handleMessage(TargetData target, MessageChain messageChain) {
+
     }
 }

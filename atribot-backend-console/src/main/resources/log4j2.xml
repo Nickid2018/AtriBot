@@ -4,15 +4,16 @@
 		<Console name="SysOut" target="SYSTEM_OUT">
 			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
 			<Filters>
-				<NoMarkerFilter onMatch="ACCEPT" onMismatch="DENY"/>
-				<ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="DENY" onMismatch="NEUTRAL"/>
+				<ThresholdFilter level="INFO" onMatch="NEUTRAL" onMismatch="DENY"/>
+				<BurstFilter level="INFO" rate="16" maxBurst="100"/>
 			</Filters>
 		</Console>
 		<RollingRandomAccessFile name="File" fileName="logs/latest.log" filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
 			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
 			<Filters>
-				<NoMarkerFilter onMatch="ACCEPT" onMismatch="DENY"/>
-				<ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="DENY" onMismatch="NEUTRAL"/>
+				<ThresholdFilter level="DEBUG" onMatch="NEUTRAL" onMismatch="DENY"/>
 			</Filters>
 			<Policies>
 				<TimeBasedTriggeringPolicy/>
@@ -25,7 +26,7 @@
 			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
 			<Filters>
 				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="ACCEPT" onMismatch="DENY"/>
-				<ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+				<ThresholdFilter level="DEBUG" onMatch="NEUTRAL" onMismatch="DENY"/>
 			</Filters>
 		</File>
 	</Appenders>

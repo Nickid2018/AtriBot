@@ -45,7 +45,6 @@ public class BackendServer implements PacketRegister {
     private final Set<Connection> connections = Collections.synchronizedSet(new ObjectLinkedOpenHashSet<>());
     private volatile ChannelFuture future;
 
-
     public BackendServer(Supplier<NetworkListener> listenerSupplier) {
         this.listenerSupplier = listenerSupplier;
 

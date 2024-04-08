@@ -18,11 +18,13 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
+@Getter
 public class Connection extends SimpleChannelInboundHandler<Packet> {
 
     public static final Supplier<NioEventLoopGroup> SERVER_EVENT_GROUP = Suppliers.memoize(
@@ -40,17 +42,12 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
     public static final Logger NETWORK_LOGGER = LoggerFactory.getLogger("Network");
     public static final Marker NETWORK_MARKER = MarkerFactory.getMarker("ATRIBOT_NETWORK");
 
-    @Getter
     private Channel channel;
-    @Getter
     private SocketAddress address;
     private final Queue<PacketHolder> packetBuffer = new ConcurrentLinkedQueue<>();
 
-    @Getter
     private final NetworkListener listener;
-    @Getter
     private final PacketRegistry registry;
-    @Getter
     private final boolean receiveFromServerSide;
 
     public Connection(NetworkListener listener, PacketRegistry registry, boolean isServerSide) {
@@ -154,7 +151,6 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
         super.channelInactive(ctx);
         listener.connectionClosed(this);
         channel = null;
-        address = null;
         packetBuffer.clear();
     }
 
