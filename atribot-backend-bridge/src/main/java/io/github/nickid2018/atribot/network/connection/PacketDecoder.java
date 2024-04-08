@@ -31,7 +31,9 @@ public class PacketDecoder extends ByteToMessageDecoder {
         packet.deserializeFromStream(buf);
         if (buf.readableBytes() > 0)
             throw new DecoderException("Bad packet [%s] - Unexpected %s byte(s) at the packet tail".formatted(
-                    packet.getClass().getName(), buf.readableBytes()));
+                packet.getClass().getName(),
+                buf.readableBytes()
+            ));
         out.add(packet);
     }
 }

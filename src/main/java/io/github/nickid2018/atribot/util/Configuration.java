@@ -34,7 +34,11 @@ public class Configuration {
         File choose = chooseConfig();
         if (choose == null) {
             log.error("No configuration file found!");
-            System.exit(1);
+            log.error("Configuration file should be one of the following:");
+            for (File file : CONFIG_FILES)
+                log.error("  - {}", file.getName());
+            log.error("Program will run with default configuration, but some features may not work properly!");
+            return;
         }
 
         log.info("Using configuration file: {}", choose.getName());
@@ -88,5 +92,10 @@ public class Configuration {
         if (obj instanceof String)
             return (String) obj;
         throw supplier.get();
+    }
+
+    public static boolean getBooleanOrElse(String key, boolean defaultValue) {
+        Object obj = getObject(key);
+        return obj instanceof Boolean ? (boolean) obj : defaultValue;
     }
 }

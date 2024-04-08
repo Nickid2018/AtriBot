@@ -30,6 +30,10 @@ public class MessageManager {
     }
 
     public void start() {
+        boolean shouldEncrypt = Configuration.getBooleanOrElse("network.encrypted", false);
+        if (shouldEncrypt)
+            log.info("The backend server is using encryption");
+        server.setShouldEncrypt(shouldEncrypt);
         int port = Configuration.getIntOrElse("network.backend_server_port", 11451);
         server.start(port);
         log.info("Backend Server started on port {}", port);

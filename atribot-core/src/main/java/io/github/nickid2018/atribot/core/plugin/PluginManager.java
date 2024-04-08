@@ -26,14 +26,14 @@ public class PluginManager {
         if (files == null)
             return;
         Stream.of(files)
-                .filter(File::isFile)
-                .map(File::getName)
-                .filter(name -> name.endsWith(".jar"))
-                .map(s -> s.substring(0, s.length() - 4))
-                .forEach(FunctionUtils.noExceptionOrElse(
-                        PluginManager::loadPlugin,
-                        (s, e) -> log.error("Failed to load plugin: " + s, e)
-                ));
+              .filter(File::isFile)
+              .map(File::getName)
+              .filter(name -> name.endsWith(".jar"))
+              .map(s -> s.substring(0, s.length() - 4))
+              .forEach(FunctionUtils.noExceptionOrElse(
+                      PluginManager::loadPlugin,
+                      (s, e) -> log.error("Failed to load plugin: {}", s, e)
+              ));
     }
 
     public static void loadPlugin(String name) throws Exception {
@@ -42,7 +42,8 @@ public class PluginManager {
             throw new IOException("Plugin not found: " + name);
         PluginClassLoader classLoader = new PluginClassLoader(file);
         try (JarFile jarFile = new JarFile(file)) {
-            List<? extends Class<?>> plugins = StreamSupport.stream(jarFile.stream().spliterator(), false)
+            List<? extends Class<?>> plugins = StreamSupport
+                    .stream(jarFile.stream().spliterator(), false)
                     .map(JarEntry::getName)
                     .filter(s -> s.endsWith(".class"))
                     .map(s -> s.substring(0, s.length() - 6).replace('/', '.'))
@@ -53,9 +54,9 @@ public class PluginManager {
                 throw new IOException("No plugin found in the jar file: " + name);
             if (plugins.size() > 1)
                 throw new IOException("Multiple plugins found in the jar file: " + name);
-            AtriBotPlugin plugin = (AtriBotPlugin) plugins.get(0).getConstructor().newInstance();
+            AtriBotPlugin plugin = (AtriBotPlugin) plugins.getFirst().getConstructor().newInstance();
             plugin.onPluginLoad();
-            PLUGINS_MAP.put(name, new PluginContainer(plugins.get(0), plugin, classLoader));
+            PLUGINS_MAP.put(name, new PluginContainer(plugins.getFirst(), plugin, classLoader));
         }
     }
 
@@ -88,7 +89,7 @@ public class PluginManager {
     public static void reloadAll() {
         forEachPluginNamesOutPlace(FunctionUtils.noExceptionOrElse(
                 PluginManager::unloadPlugin,
-                (s, e) -> log.error("Failed to unload plugin: " + s, e)
+                (s, e) -> log.error("Failed to unload plugin: {}", s, e)
         ));
         loadAll();
     }

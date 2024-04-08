@@ -16,7 +16,7 @@ public class AtriBotMain {
         manager.start();
 
         Scanner scanner = new Scanner(System.in);
-        while (true) {
+        while (scanner.hasNext()) {
             String line = scanner.nextLine();
             if (line.equals("exit")) {
                 manager.stop();

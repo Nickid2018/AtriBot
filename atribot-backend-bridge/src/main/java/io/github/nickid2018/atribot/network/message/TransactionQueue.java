@@ -25,7 +25,12 @@ public class TransactionQueue {
     private final Map<String, Consumer<? extends TransactionPacket<?>>> transactionMap = new HashMap<>();
     private final Map<Class<? extends TransactionPacket<?>>, Consumer<? extends TransactionPacket<?>>> transactionConsumerMap = new HashMap<>();
     private final ExecutorService transactionExecutor = Executors.newThreadPerTaskExecutor(
-            new ThreadFactoryBuilder().setThreadFactory(Thread.ofVirtual().factory()).setDaemon(true).setNameFormat("TransactionQueue-%d").build());
+            new ThreadFactoryBuilder()
+                    .setThreadFactory(Thread.ofVirtual().factory())
+                    .setDaemon(true)
+                    .setNameFormat("TransactionQueue-%d")
+                    .build()
+    );
 
     public <T extends TransactionPacket<?>> void registerTransactionConsumer(Class<T> clazz, Consumer<T> consumer) {
         transactionConsumerMap.put(clazz, consumer);
@@ -45,7 +50,9 @@ public class TransactionQueue {
         if (packet instanceof TransactionPacket<?> transactionPacket) {
             if (transactionPacket.isQuery()) {
                 if (transactionConsumerMap.containsKey(transactionPacket.getClass())) {
-                    Consumer<TransactionPacket<?>> consumer = (Consumer<TransactionPacket<?>>) transactionConsumerMap.get(transactionPacket.getClass());
+                    Consumer<TransactionPacket<?>> consumer = (Consumer<TransactionPacket<?>>) transactionConsumerMap.get(
+                            transactionPacket.getClass()
+                    );
                     transactionExecutor.execute(() -> consumer.accept(transactionPacket));
                 } else
                     return false;

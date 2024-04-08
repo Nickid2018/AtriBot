@@ -1,7 +1,5 @@
 package io.github.nickid2018.atribot.network.packet.backend;
 
-
-import io.github.nickid2018.atribot.network.message.ImageMessage;
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

@@ -315,8 +315,7 @@ public class PacketBuffer extends ByteBuf {
         return buf.getBytes(paramInt1, paramOutputStream, paramInt2);
     }
 
-    public int getBytes(int paramInt1, GatheringByteChannel paramGatheringByteChannel, int paramInt2)
-            throws IOException {
+    public int getBytes(int paramInt1, GatheringByteChannel paramGatheringByteChannel, int paramInt2) throws IOException {
         return buf.getBytes(paramInt1, paramGatheringByteChannel, paramInt2);
     }
 
@@ -408,8 +407,7 @@ public class PacketBuffer extends ByteBuf {
         return buf.setBytes(paramInt1, paramInputStream, paramInt2);
     }
 
-    public int setBytes(int paramInt1, ScatteringByteChannel paramScatteringByteChannel, int paramInt2)
-            throws IOException {
+    public int setBytes(int paramInt1, ScatteringByteChannel paramScatteringByteChannel, int paramInt2) throws IOException {
         return buf.setBytes(paramInt1, paramScatteringByteChannel, paramInt2);
     }
 

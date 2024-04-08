@@ -20,8 +20,12 @@ public class ConsoleBackendListener implements NetworkListener {
 
     public void setTransactionQueue(TransactionQueue transactionQueue) {
         this.transactionQueue = transactionQueue;
-        transactionQueue.registerTransactionConsumer(ImageResolveStartPacket.class,
-                packet -> transactionQueue.getConnection().sendPacket(new StopTransactionPacket(packet.getTransactionId())));
+        transactionQueue.registerTransactionConsumer(
+                ImageResolveStartPacket.class,
+                packet -> transactionQueue
+                        .getConnection()
+                        .sendPacket(new StopTransactionPacket(packet.getTransactionId()))
+        );
     }
 
     @Override
@@ -35,7 +39,7 @@ public class ConsoleBackendListener implements NetworkListener {
                         "prefixCommand", ""
                 )
         ));
-        log.info("Connection opened.");
+        log.info("Connection opened");
     }
 
     @Override
@@ -56,7 +60,7 @@ public class ConsoleBackendListener implements NetworkListener {
 
     @Override
     public void connectionClosed(Connection connection) {
-        log.info("Connection closed.");
+        log.info("Connection closed");
     }
 
     @Override

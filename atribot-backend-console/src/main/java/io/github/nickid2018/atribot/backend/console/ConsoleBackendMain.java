@@ -32,7 +32,7 @@ public class ConsoleBackendMain {
         );
 
         Scanner scanner = new Scanner(System.in);
-        while (true) {
+        while (scanner.hasNext()) {
             String line = scanner.nextLine();
             if (line.equals("exit")) {
                 client.disconnect();

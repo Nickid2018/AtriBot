@@ -50,7 +50,12 @@ public class BackendClient implements PacketRegister {
     private volatile ScheduledFuture<?> reconnectFuture;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(
-            1, new ThreadFactoryBuilder().setNameFormat("BackendClient-Scheduler").setDaemon(true).build());
+        1,
+        new ThreadFactoryBuilder()
+            .setNameFormat("Reconnect Scheduler")
+            .setDaemon(true)
+            .build()
+    );
 
     public BackendClient(NetworkListener listener) {
         this.listener = listener;
@@ -70,13 +75,14 @@ public class BackendClient implements PacketRegister {
         try {
             boolean epoll = Epoll.isAvailable();
             new Bootstrap()
-                    .group((epoll ? Connection.NETWORK_EPOLL_WORKER_GROUP : Connection.NETWORK_WORKER_GROUP).get())
-                    .handler(new ClientChannelInitializer())
-                    .channel(epoll ? EpollSocketChannel.class : NioSocketChannel.class)
-                    .connect(addr, port)
-                    .syncUninterruptibly();
+                .group((epoll ? Connection.NETWORK_EPOLL_WORKER_GROUP : Connection.NETWORK_WORKER_GROUP).get())
+                .handler(new ClientChannelInitializer())
+                .channel(epoll ? EpollSocketChannel.class : NioSocketChannel.class)
+                .connect(addr, port)
+                .syncUninterruptibly();
         } catch (Exception e) {
-            log.error("Error connecting to backend server", e);
+            log.error("Connecting to backend server failed!");
+            log.debug("Connecting Failure:", e);
             connection = null;
             if (autoReconnect && reconnectFuture == null) {
                 reconnectFuture = scheduler.scheduleAtFixedRate(() -> {
@@ -124,7 +130,10 @@ public class BackendClient implements PacketRegister {
                 case KeepAlivePacket ignored -> connection.sendPacket(msg);
                 case EncryptionStartPacket encryptionStartPacket -> {
                     if (encrypted) {
-                        listener.fatalError(connection, new IllegalStateException("Received encryption start packet after encryption started"));
+                        listener.fatalError(
+                            connection,
+                            new IllegalStateException("Received encryption start packet after encryption started")
+                        );
                         connection.disconnect();
                         return;
                     }
@@ -144,7 +153,17 @@ public class BackendClient implements PacketRegister {
                     active = true;
                     listener.connectionOpened(connection);
                 }
-                case null, default -> listener.receivePacket(connection, msg);
+                default -> {
+                    if (!active) {
+                        listener.fatalError(
+                            connection,
+                            new IllegalStateException("Received packet before connection opened")
+                        );
+                        connection.disconnect();
+                        return;
+                    }
+                    listener.receivePacket(connection, msg);
+                }
             }
         }
 

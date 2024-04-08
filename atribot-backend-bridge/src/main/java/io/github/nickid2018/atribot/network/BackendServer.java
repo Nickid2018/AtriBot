@@ -89,11 +89,10 @@ public class BackendServer implements PacketRegister {
         }
     }
 
-    public BackendServer setShouldEncrypt(boolean shouldEncrypt) {
+    public void setShouldEncrypt(boolean shouldEncrypt) {
         if (future != null)
-            return this;
+            return;
         this.shouldEncrypt = shouldEncrypt;
-        return this;
     }
 
     public void broadcastPacket(Packet packet) {
@@ -156,13 +155,19 @@ public class BackendServer implements PacketRegister {
                 if (ping > 10000)
                     log.warn("Client {} has a high ping: {}ms", connection.getAddress(), ping);
             } else if (msg instanceof EncryptionProgressPacket encryptionProgressPacket) {
-                byte[] decryptedChallenge = CipherHelper.decrypt(encryptionProgressPacket.getEncryptedChallenge(), keyPair.getPrivate());
+                byte[] decryptedChallenge = CipherHelper.decrypt(
+                        encryptionProgressPacket.getEncryptedChallenge(),
+                        keyPair.getPrivate()
+                );
                 if (!Arrays.equals(decryptedChallenge, encryptionChallenge)) {
                     log.warn("Client {} has a wrong challenge", connection.getAddress());
                     connection.disconnect();
                     return;
                 }
-                byte[] decryptedKey = CipherHelper.decrypt(encryptionProgressPacket.getEncryptedSecretKey(), keyPair.getPrivate());
+                byte[] decryptedKey = CipherHelper.decrypt(
+                        encryptionProgressPacket.getEncryptedSecretKey(),
+                        keyPair.getPrivate()
+                );
                 encryptionChallenge = null;
                 keyPair = null;
                 SecretKey secretKey = CipherHelper.decodeSecretKey(decryptedKey);

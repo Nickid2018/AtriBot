@@ -39,11 +39,11 @@ public class PacketRegistry {
             throw new DecoderException("Unknown packet id: " + id);
         if (serverSide && !serverSidePackets.contains(id))
             throw new DecoderException(
-                    "Packet id %d is not server side packet".formatted(id)
+                "Packet id %d is not server side packet".formatted(id)
             );
         if (!serverSide && !clientSidePackets.contains(id))
             throw new DecoderException(
-                    "Packet id %d is not client side packet".formatted(id)
+                "Packet id %d is not client side packet".formatted(id)
             );
         return packetCreationRegistry.get(id).get();
     }

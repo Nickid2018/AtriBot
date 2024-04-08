@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,17 +26,37 @@ import java.util.function.Supplier;
 @Getter
 public class Connection extends SimpleChannelInboundHandler<Packet> {
 
-    public static final Supplier<NioEventLoopGroup> SERVER_EVENT_GROUP = Suppliers.memoize(
-            () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Server IO #%d").setDaemon(true).build()));
+    public static final Supplier<NioEventLoopGroup> SERVER_EVENT_GROUP = Suppliers.memoize(() -> new NioEventLoopGroup(
+        0,
+        new ThreadFactoryBuilder()
+            .setNameFormat("Netty Server IO #%d")
+            .setDaemon(true)
+            .build()
+    ));
 
-    public static final Supplier<EpollEventLoopGroup> SERVER_EPOLL_EVENT_GROUP = Suppliers.memoize(
-            () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Server IO #%d").setDaemon(true).build()));
+    public static final Supplier<EpollEventLoopGroup> SERVER_EPOLL_EVENT_GROUP = Suppliers.memoize(() -> new EpollEventLoopGroup(
+        0,
+        new ThreadFactoryBuilder()
+            .setNameFormat("Epoll Server IO #%d")
+            .setDaemon(true)
+            .build()
+    ));
 
-    public static final Supplier<NioEventLoopGroup> NETWORK_WORKER_GROUP = Suppliers.memoize(
-            () -> new NioEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Client IO #%d").setDaemon(true).build()));
+    public static final Supplier<NioEventLoopGroup> NETWORK_WORKER_GROUP = Suppliers.memoize(() -> new NioEventLoopGroup(
+        0,
+        new ThreadFactoryBuilder()
+            .setNameFormat("Netty Client IO #%d")
+            .setDaemon(true)
+            .build()
+    ));
 
-    public static final Supplier<EpollEventLoopGroup> NETWORK_EPOLL_WORKER_GROUP = Suppliers.memoize(
-            () -> new EpollEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Epoll Client IO #%d").setDaemon(true).build()));
+    public static final Supplier<EpollEventLoopGroup> NETWORK_EPOLL_WORKER_GROUP = Suppliers.memoize(() -> new EpollEventLoopGroup(
+        0,
+        new ThreadFactoryBuilder()
+            .setNameFormat("Epoll Client IO #%d")
+            .setDaemon(true)
+            .build()
+    ));
 
     public static final Logger NETWORK_LOGGER = LoggerFactory.getLogger("Network");
     public static final Marker NETWORK_MARKER = MarkerFactory.getMarker("ATRIBOT_NETWORK");
@@ -68,7 +87,12 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Packet msg) {
         if (NETWORK_LOGGER.isDebugEnabled())
-            NETWORK_LOGGER.debug(NETWORK_MARKER, "Received packet: {}, hash = {}", msg.getClass().getSimpleName(), msg.hashCode());
+            NETWORK_LOGGER.debug(
+                NETWORK_MARKER,
+                "Received packet: {}, hash = {}",
+                msg.getClass().getSimpleName(),
+                msg.hashCode()
+            );
         listener.receivePacket(this, msg);
     }
 
@@ -109,7 +133,12 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
 
     public void sendPacket(Packet msg, GenericFutureListener<? extends Future<? super Void>> listener) {
         if (NETWORK_LOGGER.isDebugEnabled())
-            NETWORK_LOGGER.debug(NETWORK_MARKER, "Sending or pushing packet: {}, hash = {}", msg.getClass().getSimpleName(), msg.hashCode());
+            NETWORK_LOGGER.debug(
+                NETWORK_MARKER,
+                "Sending or pushing packet: {}, hash = {}",
+                msg.getClass().getSimpleName(),
+                msg.hashCode()
+            );
         if (isNotActive()) {
             PacketHolder holder = new PacketHolder(msg, listener);
             packetBuffer.offer(holder);
@@ -156,12 +185,13 @@ public class Connection extends SimpleChannelInboundHandler<Packet> {
 
     public static void setupChannel(Channel channel, Connection connection) {
         channel.config().setOption(ChannelOption.TCP_NODELAY, true);
-        channel.pipeline()
-                .addLast("timeout", new ReadTimeoutHandler(30))
-                .addLast("splitter", new SplitterHandler())
-                .addLast("decoder", new PacketDecoder(connection))
-                .addLast("prepender", new SizePrepender())
-                .addLast("encoder", new PacketEncoder(connection))
-                .addLast("packet_handler", connection);
+        channel
+            .pipeline()
+            .addLast("timeout", new ReadTimeoutHandler(30))
+            .addLast("splitter", new SplitterHandler())
+            .addLast("decoder", new PacketDecoder(connection))
+            .addLast("prepender", new SizePrepender())
+            .addLast("encoder", new PacketEncoder(connection))
+            .addLast("packet_handler", connection);
     }
 }
