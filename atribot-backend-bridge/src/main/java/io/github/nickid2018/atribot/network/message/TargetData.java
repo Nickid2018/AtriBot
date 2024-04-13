@@ -1,16 +1,16 @@
 package io.github.nickid2018.atribot.network.message;
 
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+
+import java.io.Serializable;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class TargetData {
+@EqualsAndHashCode
+public class TargetData implements Serializable {
 
     private String targetGroup;
     private String targetUser;

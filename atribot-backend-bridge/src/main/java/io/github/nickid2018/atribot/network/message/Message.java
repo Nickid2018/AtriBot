@@ -2,7 +2,9 @@ package io.github.nickid2018.atribot.network.message;
 
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
 
-public interface Message {
+import java.io.Serializable;
+
+public interface Message extends Serializable {
 
     void serializeToStream(PacketBuffer buffer) throws Exception;
 

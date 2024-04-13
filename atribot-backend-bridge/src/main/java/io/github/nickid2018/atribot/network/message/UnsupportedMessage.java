@@ -13,4 +13,14 @@ public class UnsupportedMessage implements Message {
     @Override
     public void deserializeFromStream(PacketBuffer buffer) throws Exception {
     }
+
+    @Override
+    public int hashCode() {
+        return 1145141919;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof UnsupportedMessage;
+    }
 }

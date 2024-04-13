@@ -176,8 +176,8 @@ public class BackendClient implements PacketRegister {
                 listener.connectionClosed(connection);
                 if (autoReconnect) {
                     log.info("Connection closed, start reconnecting scheduler");
+                    InetSocketAddress address = (InetSocketAddress) connection.getAddress();
                     reconnectFuture = scheduler.scheduleAtFixedRate(() -> {
-                        InetSocketAddress address = (InetSocketAddress) connection.getAddress();
                         log.info("Reconnecting to backend server: {}:{}", address.getAddress(), address.getPort());
                         connect(address.getAddress(), address.getPort());
                     }, 30, 40, TimeUnit.SECONDS);

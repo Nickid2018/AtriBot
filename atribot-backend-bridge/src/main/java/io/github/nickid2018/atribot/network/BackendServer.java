@@ -64,12 +64,12 @@ public class BackendServer implements PacketRegister {
             return;
         boolean epoll = Epoll.isAvailable();
         future = new ServerBootstrap()
-                .channel(epoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
-                .childHandler(new ServerChannelInitializer())
-                .group((epoll ? Connection.SERVER_EPOLL_EVENT_GROUP : Connection.SERVER_EVENT_GROUP).get())
-                .localAddress((InetAddress) null, port)
-                .bind()
-                .syncUninterruptibly();
+            .channel(epoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
+            .childHandler(new ServerChannelInitializer())
+            .group((epoll ? Connection.SERVER_EPOLL_EVENT_GROUP : Connection.SERVER_EVENT_GROUP).get())
+            .localAddress((InetAddress) null, port)
+            .bind()
+            .syncUninterruptibly();
         if (!keepAliveThread.isAlive())
             keepAliveThread.start();
     }
@@ -156,8 +156,8 @@ public class BackendServer implements PacketRegister {
                     log.warn("Client {} has a high ping: {}ms", connection.getAddress(), ping);
             } else if (msg instanceof EncryptionProgressPacket encryptionProgressPacket) {
                 byte[] decryptedChallenge = CipherHelper.decrypt(
-                        encryptionProgressPacket.getEncryptedChallenge(),
-                        keyPair.getPrivate()
+                    encryptionProgressPacket.getEncryptedChallenge(),
+                    keyPair.getPrivate()
                 );
                 if (!Arrays.equals(decryptedChallenge, encryptionChallenge)) {
                     log.warn("Client {} has a wrong challenge", connection.getAddress());
@@ -165,8 +165,8 @@ public class BackendServer implements PacketRegister {
                     return;
                 }
                 byte[] decryptedKey = CipherHelper.decrypt(
-                        encryptionProgressPacket.getEncryptedSecretKey(),
-                        keyPair.getPrivate()
+                    encryptionProgressPacket.getEncryptedSecretKey(),
+                    keyPair.getPrivate()
                 );
                 encryptionChallenge = null;
                 keyPair = null;

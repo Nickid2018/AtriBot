@@ -4,10 +4,7 @@ import io.github.nickid2018.atribot.network.connection.Connection;
 import io.github.nickid2018.atribot.network.listener.NetworkListener;
 import io.github.nickid2018.atribot.network.message.*;
 import io.github.nickid2018.atribot.network.packet.Packet;
-import io.github.nickid2018.atribot.network.packet.backend.BackendBasicInformationPacket;
-import io.github.nickid2018.atribot.network.packet.backend.ImageResolveStartPacket;
-import io.github.nickid2018.atribot.network.packet.backend.MessagePacket;
-import io.github.nickid2018.atribot.network.packet.backend.StopTransactionPacket;
+import io.github.nickid2018.atribot.network.packet.backend.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
@@ -39,6 +36,7 @@ public class ConsoleBackendListener implements NetworkListener {
                         "prefixCommand", ""
                 )
         ));
+        connection.sendPacket(QueuedMessageRequestPacket.INSTANCE);
         log.info("Connection opened");
     }
 
@@ -46,7 +44,7 @@ public class ConsoleBackendListener implements NetworkListener {
     public void receivePacket(Connection connection, Packet msg) {
         if (transactionQueue.resolveTransaction(msg))
             return;
-        if (msg instanceof MessagePacket packet) {
+        if (msg instanceof SendMessagePacket packet) {
             MessageChain chain = packet.getMessageChain();
             String message = chain.flatten().getMessages().stream().map(m -> switch (m) {
                 case TextMessage textMessage -> textMessage.getText();
@@ -55,6 +53,7 @@ public class ConsoleBackendListener implements NetworkListener {
                 default -> "";
             }).collect(Collectors.joining());
             log.info("Received message: {}", message);
+            connection.sendPacket(new MessageSentPacket(packet.getUniqueID()));
         }
     }
 

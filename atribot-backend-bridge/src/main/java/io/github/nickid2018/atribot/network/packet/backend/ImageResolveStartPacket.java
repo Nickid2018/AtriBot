@@ -1,10 +1,7 @@
 package io.github.nickid2018.atribot.network.packet.backend;
 
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -13,6 +10,7 @@ import java.util.Set;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 public class ImageResolveStartPacket extends TransactionPacket<ImageResolveResultPacket> {
 
     private Set<String> imageMessageKeys = new HashSet<>();

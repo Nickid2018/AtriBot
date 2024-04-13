@@ -22,7 +22,10 @@ public interface PacketRegister {
 
     static void registerBackendPackets(PacketRegister register) {
         register.addPacket(BackendBasicInformationPacket.class, BackendBasicInformationPacket::new, false, true);
-        register.addPacket(MessagePacket.class, MessagePacket::new, true, true);
+        register.addPacket(MessagePacket.class, MessagePacket::new, false, true);
+        register.addPacket(SendMessagePacket.class, SendMessagePacket::new, true, false);
+        register.addPacket(MessageSentPacket.class, MessageSentPacket::new, false, true);
+        register.addPacket(QueuedMessageRequestPacket.class, QueuedMessageRequestPacket::new, false, true);
         register.addPacket(StopTransactionPacket.class, StopTransactionPacket::new, true, true);
         register.addPacket(ImageResolveStartPacket.class, ImageResolveStartPacket::new, true, true);
         register.addPacket(ImageResolveResultPacket.class, ImageResolveResultPacket::new, true, true);

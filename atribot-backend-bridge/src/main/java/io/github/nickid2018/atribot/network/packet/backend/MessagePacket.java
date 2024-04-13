@@ -4,15 +4,13 @@ import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.network.packet.Packet;
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode
 public class MessagePacket implements Packet {
 
     private TargetData targetData;

@@ -2,10 +2,7 @@ package io.github.nickid2018.atribot.network.packet.backend;
 
 import io.github.nickid2018.atribot.network.packet.Packet;
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.util.UUID;
 
@@ -14,6 +11,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuppressWarnings("unused")
+@EqualsAndHashCode
 public abstract class TransactionPacket<P extends TransactionPacket<?>> implements Packet {
 
     private String transactionId = UUID.randomUUID().toString();

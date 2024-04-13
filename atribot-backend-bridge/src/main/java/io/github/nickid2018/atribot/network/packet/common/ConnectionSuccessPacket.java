@@ -12,4 +12,14 @@ public class ConnectionSuccessPacket implements Packet {
     @Override
     public void deserializeFromStream(PacketBuffer buffer) {
     }
+
+    @Override
+    public int hashCode() {
+        return 1145141919;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof ConnectionSuccessPacket;
+    }
 }

@@ -3,6 +3,7 @@ package io.github.nickid2018.atribot.network.packet.backend;
 import io.github.nickid2018.atribot.network.packet.Packet;
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -12,6 +13,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode
 public class BackendBasicInformationPacket implements Packet {
 
     public static final int PROTOCOL_VERSION = 0x1001;

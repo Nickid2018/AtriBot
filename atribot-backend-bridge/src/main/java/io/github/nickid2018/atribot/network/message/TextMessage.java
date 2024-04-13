@@ -1,15 +1,13 @@
 package io.github.nickid2018.atribot.network.message;
 
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode
 public class TextMessage implements Message {
 
     private String text;
@@ -25,5 +23,14 @@ public class TextMessage implements Message {
     public void deserializeFromStream(PacketBuffer buffer) throws Exception {
         text = buffer.readString();
         markdown = buffer.readBoolean();
+    }
+
+    public static String concatText(MessageChain chain) {
+        StringBuilder builder = new StringBuilder();
+        chain.forEachMessage(message -> {
+            if (message instanceof TextMessage textMessage)
+                builder.append(textMessage.text);
+        });
+        return builder.toString();
     }
 }

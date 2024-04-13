@@ -8,6 +8,8 @@ public interface AtriBotPlugin {
 
     CommunicateReceiver getCommunicateReceiver();
 
+    void onPluginPreload() throws Exception;
+
     void onPluginLoad() throws Exception;
 
     void onPluginUnload() throws Exception;

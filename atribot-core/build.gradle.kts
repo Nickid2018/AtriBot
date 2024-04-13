@@ -11,7 +11,7 @@ repositories {
 }
 
 dependencies {
-   api(project(":atribot-backend-bridge"))
+    api(project(":atribot-backend-bridge"))
 
     api("com.j256.ormlite:ormlite-jdbc:6.1")
     implementation("org.xerial:sqlite-jdbc:3.45.1.0")

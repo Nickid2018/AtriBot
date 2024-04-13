@@ -1,6 +1,7 @@
 package io.github.nickid2018.atribot.network.message;
 
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -10,6 +11,7 @@ import java.util.function.Consumer;
 
 @Getter
 @NoArgsConstructor
+@EqualsAndHashCode
 public class MessageChain implements Message {
 
     private final List<Message> messages = new ArrayList<>();
@@ -65,5 +67,9 @@ public class MessageChain implements Message {
             message.deserializeFromStream(buffer);
             messages.add(message);
         }
+    }
+
+    public static MessageChain text(String text) {
+        return new MessageChain().next(new TextMessage(text, false));
     }
 }
