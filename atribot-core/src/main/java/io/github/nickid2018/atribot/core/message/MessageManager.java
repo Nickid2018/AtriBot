@@ -84,6 +84,8 @@ public class MessageManager {
         String prefixCommand = backendInfo.getOrDefault("prefixCommand", "/");
         if (textPlain.startsWith(prefixCommand)) {
             List<String> commandLine = getCommandLine(textPlain, prefixCommand);
+            if (commandLine.isEmpty())
+                return;
             String[] args = commandLine.subList(1, commandLine.size()).toArray(String[]::new);
             String command = commandLine.getFirst();
             Communication.communicate(

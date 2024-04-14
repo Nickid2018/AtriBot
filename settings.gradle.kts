@@ -3,7 +3,7 @@ fun includeProject(name: String, path: String = name) {
     project(":${name}").projectDir = file(path)
 }
 
-rootProject.name = "AtriBot"
+rootProject.name = "atribot"
 
 includeProject("atribot-core") // Core module
 includeProject("atribot-backend-bridge") // Backend Bridge

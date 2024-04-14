@@ -1,6 +1,7 @@
 plugins {
     id("java")
     id("java-library")
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "io.github.nickid2018"
@@ -32,3 +33,75 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok:1.18.32")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.32")
 }
+
+subprojects {
+    val project = this
+
+    apply(plugin = "java")
+    apply(plugin = "java-library")
+    apply(plugin = "com.github.johnrengelman.shadow")
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        testImplementation(platform("org.junit:junit-bom:5.9.1"))
+        testImplementation("org.junit.jupiter:junit-jupiter")
+        annotationProcessor("org.projectlombok:lombok:1.18.32")
+        testAnnotationProcessor("org.projectlombok:lombok:1.18.32")
+    }
+
+    tasks.test {
+        useJUnitPlatform()
+    }
+
+    fun isPluginProject(): Boolean {
+        return project.configurations.compileClasspath.get().resolvedConfiguration.resolvedArtifacts
+            .any { it.id.componentIdentifier.displayName == "project :atribot-core" }
+    }
+
+    tasks.register("generateDependenciesFile") {
+        val dependenciesData = project.configurations.compileClasspath.get().resolvedConfiguration.resolvedArtifacts
+
+        val coreDependenciesFileData = if (isPluginProject()) {
+            project(":atribot-core").configurations.compileClasspath.get()
+                .resolvedConfiguration.resolvedArtifacts
+                .filter { it.type == "jar" }
+        } else {
+            emptyList()
+        }
+
+        val dependenciesFileData = dependenciesData
+            .asSequence()
+            .filter { it.type == "jar" }
+            .filter { !isPluginProject() || !coreDependenciesFileData.contains(it) }
+            .map { it.id.componentIdentifier.displayName }
+            .sorted()
+            .joinToString("\n") { it }
+
+        val file = project.layout.buildDirectory.file("DEPENDENCIES").get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(dependenciesFileData)
+    }
+
+    tasks.withType<ProcessResources> {
+        dependsOn("generateDependenciesFile")
+        from(project.layout.buildDirectory.file("DEPENDENCIES")) {
+            into("META-INF")
+        }
+    }
+
+    tasks.shadowJar {
+        dependencies {
+            if (!isPluginProject()) {
+                include(dependency("io.github.nickid2018:atribot:"))
+                include(dependency("io.github.nickid2018:atribot-backend-bridge:"))
+            } else {
+                exclude(dependency("::"))
+            }
+        }
+        manifest.inheritFrom(tasks.jar.get().manifest)
+    }
+}
+

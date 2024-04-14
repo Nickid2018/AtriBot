@@ -74,7 +74,7 @@ public class PluginManager {
         File file = new File(PLUGIN_FOLDER, name + ".jar");
         if (!file.exists() || !file.isFile())
             throw new IOException("Plugin not found: " + name);
-        PluginClassLoader classLoader = new PluginClassLoader(file);
+        PluginClassLoader classLoader = new PluginClassLoader(file, log::debug, log::info, log::error);
         try (JarFile jarFile = new JarFile(file)) {
             List<? extends Class<?>> plugins = StreamSupport
                 .stream(jarFile.stream().spliterator(), false)
