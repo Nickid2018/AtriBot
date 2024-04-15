@@ -42,6 +42,22 @@ public class AtriBotMain {
                 PluginManager.unloadAll();
                 break;
             }
+            try {
+                if (line.equals("reload")) {
+                    PluginManager.reloadAll();
+                }
+                if (line.equals("unload")) {
+                    PluginManager.unloadAll();
+                }
+                if (line.startsWith("load ")) {
+                    PluginManager.loadPlugin(line.substring(5));
+                }
+                if (line.startsWith("unload ")) {
+                    PluginManager.unloadPlugin(line.substring(7));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 }

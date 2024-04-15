@@ -10,6 +10,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class PluginInfo {
 
+    private final String identifier;
     private final String name;
     private final String version;
     private final String author;

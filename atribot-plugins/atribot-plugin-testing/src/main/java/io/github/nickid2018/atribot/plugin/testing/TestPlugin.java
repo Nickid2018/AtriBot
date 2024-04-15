@@ -11,7 +11,13 @@ public class TestPlugin implements AtriBotPlugin {
 
     @Override
     public PluginInfo getPluginInfo() {
-        return new PluginInfo("Test Plugin", "1.0", "Nickid2018", "Test plugin for AtriBot");
+        return new PluginInfo(
+            "atribot-plugin-testing",
+            "Test Plugin",
+            "1.0",
+            "Nickid2018",
+            "Test plugin for AtriBot"
+        );
     }
 
     @Override

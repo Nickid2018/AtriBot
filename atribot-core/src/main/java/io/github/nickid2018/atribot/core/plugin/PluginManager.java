@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.jar.JarEntry;
@@ -45,16 +46,22 @@ public class PluginManager {
                 .forEach(FunctionUtil.noExceptionOrElse(
                     clazz -> {
                         AtriBotPlugin plugin = (AtriBotPlugin) clazz.getConstructor().newInstance();
-                        log.info("Loading dev plugin: {}", clazz.getSimpleName());
+                        log.info("Add dev plugin: {}", clazz.getSimpleName());
                         plugin.onPluginPreload();
-                        PLUGINS_MAP.put(clazz.getSimpleName() + "[dev]", new PluginContainer(clazz, plugin, null));
+                        PluginInfo info = plugin.getPluginInfo();
+                        PLUGINS_MAP.put(info.getIdentifier(), new PluginContainer(clazz, plugin, null, true));
                     },
                     (clazz, e) -> log.error("Failed to preload plugin: {}", clazz.getName(), e)
                 ));
         }
 
-        log.info("All plugins loaded! List of plugins: ");
-        PLUGINS_MAP.keySet().stream().map(s -> "\t- " + s).forEach(log::info);
+        log.info("All plugins preloaded! List of plugins: ");
+        PLUGINS_MAP
+            .entrySet()
+            .stream()
+            .map(en -> en.getKey() + (en.getValue().devPlugin() ? "[dev]" : ""))
+            .map(t -> "\t- " + t)
+            .forEach(log::info);
 
         for (Map.Entry<String, PluginContainer> entry : PLUGINS_MAP.entrySet()) {
             PluginContainer container = entry.getValue();
@@ -68,6 +75,8 @@ public class PluginManager {
                 }
             }
         }
+
+        log.info("All plugins loaded!");
     }
 
     public static void preLoadPlugin(String name) throws Exception {
@@ -90,10 +99,17 @@ public class PluginManager {
             if (plugins.size() > 1)
                 throw new IOException("Multiple plugins found in the jar file: " + name);
             AtriBotPlugin plugin = (AtriBotPlugin) plugins.getFirst().getConstructor().newInstance();
-            log.info("Loading plugin: {}", name);
+            log.info("Add plugin: {}", name);
             plugin.onPluginPreload();
-            PLUGINS_MAP.put(name, new PluginContainer(plugins.getFirst(), plugin, classLoader));
+            PluginInfo info = plugin.getPluginInfo();
+            PLUGINS_MAP.put(info.getIdentifier(), new PluginContainer(plugins.getFirst(), plugin, classLoader, false));
         }
+    }
+
+    public static void loadPlugin(String name) throws Exception {
+        preLoadPlugin(name);
+        PluginContainer container = PLUGINS_MAP.get(name);
+        container.pluginInstance().onPluginLoad();
     }
 
     public static void unloadPlugin(String name) throws Exception {

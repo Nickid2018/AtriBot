@@ -29,17 +29,34 @@ import java.util.stream.StreamSupport;
 public class WakatimeReceiver implements CommunicateReceiver {
 
     private final WakatimePlugin plugin;
-    private static final Set<String> keys = Set.of("atribot.message.command");
+    private static final Set<String> keys = Set.of(
+        "atribot.message.command",
+        "oauth2.service.started",
+        "oauth2.service.stopped"
+    );
 
     @Override
     public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) {
-        CommandCommunicateData messageData = (CommandCommunicateData) data;
+        switch (communicateKey) {
+            case "oauth2.service.started" -> plugin.registerOAuth2Service();
+            case "oauth2.service.stopped" -> plugin.oauth2ServiceAvailable = false;
+            case "atribot.message.command" -> doCommand((CommandCommunicateData) data);
+        }
+        return null;
+    }
+
+    public void doCommand(CommandCommunicateData messageData) {
         if (!messageData.commandHead.equals("wakatime"))
-            return null;
+            return;
 
         String backendID = messageData.backendID;
         TargetData target = messageData.targetData;
         MessageManager manager = messageData.messageManager;
+
+        if (!plugin.oauth2ServiceAvailable) {
+            manager.sendMessage(backendID, target, MessageChain.text("OAuth 2.0服务不可用"));
+            return;
+        }
 
         if (messageData.commandArgs.length == 0) {
 
@@ -59,18 +76,20 @@ public class WakatimeReceiver implements CommunicateReceiver {
                 );
             }
         }
-
-        return null;
     }
 
     public void printSummary(String url, String backendID, MessageManager manager, TargetData targetData) {
-        Communication.<Map<?, ?>, String>communicateWithResult("OAuth2Plugin[dev]", "oauth2.authenticate", Map.of(
-            "oauthName", "wakatime",
-            "backendID", backendID,
-            "target", targetData,
-            "manager", manager,
-            "scopes", List.of("read_logged_time")
-        )).thenAcceptAsync(FunctionUtil.noExceptionOrElse(accessToken -> {
+        Communication.<Map<?, ?>, String>communicateWithResult(
+            "atribot-plugin-oauth2-service",
+            "oauth2.authenticate",
+            Map.of(
+                "oauthName", "wakatime",
+                "backendID", backendID,
+                "target", targetData,
+                "manager", manager,
+                "scopes", List.of("read_logged_time")
+            )
+        ).thenAcceptAsync(FunctionUtil.noExceptionOrElse(accessToken -> {
             HttpGet get = new HttpGet(url);
             get.addHeader("Authorization", "Bearer " + accessToken);
 

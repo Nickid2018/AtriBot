@@ -1,9 +1,11 @@
 package io.github.nickid2018.atribot.util;
 
 import java.io.*;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashSet;
@@ -21,7 +23,7 @@ public class ClassPathDependencyResolver {
         if (libraryPath == null)
             libraryPath = System.getProperty("atribot.libraryPath");
         if (libraryPath == null)
-            libraryPath = "/libraries";
+            libraryPath = "libraries";
         LIBRARY_PATH = new File(libraryPath);
     }
 
@@ -34,7 +36,7 @@ public class ClassPathDependencyResolver {
             .endsWith(".jar");
     }
 
-    public static void resolveCoreDependencies() throws IOException {
+    public static void resolveCoreDependencies() throws Throwable {
         System.out.println("Loading dependencies");
 
         String jarPath = ClassPathDependencyResolver.class
@@ -47,15 +49,21 @@ public class ClassPathDependencyResolver {
             System.exit(1);
         }
 
-        ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
         URL[] urls = resolveDependencies(
             new File(jarPath),
             s -> {},
             System.out::println,
             System.err::println
         );
-        URLClassLoader loader = new URLClassLoader(urls, contextLoader);
-        Thread.currentThread().setContextClassLoader(loader);
+
+        // Add command line argument: --add-opens java.base/jdk.internal.loader=ALL-UNNAMED
+        ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
+        Class<?> builtinClassLoaderClass = systemLoader.getClass();
+        MethodHandle addURL = MethodHandles.privateLookupIn(builtinClassLoaderClass, MethodHandles.lookup())
+            .findVirtual(builtinClassLoaderClass, "appendClassPath", MethodType.methodType(void.class, String.class));
+        for (URL url : urls) {
+            addURL.invoke(systemLoader, url.getFile());
+        }
     }
 
     public static URL[] resolveDependencies(File jarFile, Consumer<String> debugService, Consumer<String> loggerService, Consumer<String> errorService) throws IOException {
@@ -72,6 +80,8 @@ public class ClassPathDependencyResolver {
             String depListStr = new String(zipFile.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
             String[] depList = depListStr.split("\n");
             for (String dep : depList) {
+                if (dep.isEmpty())
+                    continue;
                 String[] depInfo = dep.split(":");
                 String depGroup = depInfo[0];
                 String depName = depInfo[1];
@@ -84,8 +94,9 @@ public class ClassPathDependencyResolver {
                     : "Checking dependency %s:%s:%s:%s".formatted(depGroup, depName, depVersion, depClassifier)
                 );
 
-                String path = "%s/%s/%s-%s%s.jar".formatted(
+                String path = "%s/%s/%s/%s-%s%s.jar".formatted(
                     depGroup.replace('.', '/'),
+                    depName,
                     depVersion,
                     depName,
                     depVersion,

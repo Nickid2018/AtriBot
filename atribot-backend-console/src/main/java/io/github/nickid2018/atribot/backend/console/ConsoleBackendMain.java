@@ -7,6 +7,7 @@ import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.network.message.TextMessage;
 import io.github.nickid2018.atribot.network.message.TransactionQueue;
 import io.github.nickid2018.atribot.network.packet.backend.MessagePacket;
+import io.github.nickid2018.atribot.util.ClassPathDependencyResolver;
 import io.github.nickid2018.atribot.util.Configuration;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,9 @@ public class ConsoleBackendMain {
 
     @SneakyThrows
     public static void main(String[] args) {
+        if (ClassPathDependencyResolver.inProductionEnvironment())
+            ClassPathDependencyResolver.resolveCoreDependencies();
+
         Configuration.init();
 
         ConsoleBackendListener listener = new ConsoleBackendListener();
