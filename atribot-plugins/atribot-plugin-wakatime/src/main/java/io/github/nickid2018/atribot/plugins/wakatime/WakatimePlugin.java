@@ -34,8 +34,14 @@ public class WakatimePlugin extends AbstractAtriBotPlugin {
     }
 
     @Override
-    public void onPluginLoad() throws Exception {
+    public void onPluginLoad() {
         registerOAuth2Service();
+    }
+
+    @Override
+    public void onPluginUnload() throws Exception {
+        Communication.communicate("oauth2.unregister", "wakatime");
+        super.onPluginUnload();
     }
 
     public void registerOAuth2Service() {

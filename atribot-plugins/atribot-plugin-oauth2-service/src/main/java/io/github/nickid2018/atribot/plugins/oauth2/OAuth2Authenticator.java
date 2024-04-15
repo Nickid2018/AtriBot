@@ -9,11 +9,8 @@ import com.sun.net.httpserver.HttpHandler;
 import io.github.nickid2018.atribot.core.message.MessageManager;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
-import io.github.nickid2018.atribot.network.message.TextMessage;
-import io.github.nickid2018.atribot.util.Configuration;
-import io.github.nickid2018.atribot.util.FunctionUtil;
-import io.github.nickid2018.atribot.util.JsonUtil;
-import io.github.nickid2018.atribot.util.WebUtil;
+import io.github.nickid2018.atribot.util.*;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -29,9 +26,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 @Slf4j
+@Getter
 @RequiredArgsConstructor
 public class OAuth2Authenticator implements HttpHandler {
 
@@ -143,23 +143,27 @@ public class OAuth2Authenticator implements HttpHandler {
                 UrlEncodedFormEntity entity = new UrlEncodedFormEntity(pairs, StandardCharsets.UTF_8);
                 post.setEntity(entity);
 
-                return CompletableFuture.supplyAsync(FunctionUtil.noException(() -> {
-                    JsonObject object = WebUtil.fetchDataInJson(post).getAsJsonObject();
-                    String accessToken = JsonUtil.getStringOrNull(object, "access_token");
-                    String refreshToken = JsonUtil.getStringOrNull(object, "refresh_token");
-                    long expiredTime = JsonUtil.getIntOrZero(object, "expires_in") * 1000L + System.currentTimeMillis();
-                    AuthenticateToken refreshed = new AuthenticateToken(
-                        token.id,
-                        accessToken,
-                        expiredTime,
-                        refreshToken,
-                        token.scopes
-                    );
-                    tokenDao.createOrUpdate(refreshed);
-                    return accessToken;
-                }), plugin.getExecutorService()).exceptionallyAsync(FunctionUtil.noException(t -> {
-                    return authenticateCode(backendID, target, manager, scopes, extraParameters).get();
-                }), plugin.getExecutorService());
+                return CompletableFuture
+                    .supplyAsync(FunctionUtil.noException(() -> {
+                        JsonObject object = WebUtil.fetchDataInJson(post).getAsJsonObject();
+                        String accessToken = JsonUtil.getStringOrNull(object, "access_token");
+                        String refreshToken = JsonUtil.getStringOrNull(object, "refresh_token");
+                        long expiredTime = JsonUtil.getIntOrZero(
+                            object,
+                            "expires_in"
+                        ) * 1000L + System.currentTimeMillis();
+                        AuthenticateToken refreshed = new AuthenticateToken(
+                            token.id,
+                            accessToken,
+                            expiredTime,
+                            refreshToken,
+                            token.scopes
+                        );
+                        tokenDao.createOrUpdate(refreshed);
+                        return accessToken;
+                    }), plugin.getExecutorService()).exceptionallyAsync(FunctionUtil.noException(t -> {
+                        return authenticateCode(backendID, target, manager, scopes, extraParameters).get();
+                    }), plugin.getExecutorService());
             }
             return authenticateCode(backendID, target, manager, scopes, extraParameters);
         } catch (Exception e) {
@@ -189,7 +193,15 @@ public class OAuth2Authenticator implements HttpHandler {
         if (!extra.isEmpty())
             url += "&" + extra;
 
-        CompletableFuture<String> future = new CompletableFuture<>();
+        CompletableFuture<String> future = new CompletableFuture<String>()
+            .orTimeout(10, TimeUnit.MINUTES)
+            .exceptionallyAsync(t -> {
+                if (t instanceof TimeoutException) {
+                    authSequence.remove(state);
+                    throw BaseExceptions.GENERAL_TIMEOUT_EXCEPTION;
+                } else
+                    throw new RuntimeException("Impossible error", t);
+            }, plugin.getExecutorService());
         authSequence.put(state, Triple.of(target.getTargetUser(), scopes, future));
         manager.sendMessage(
             backendID,
@@ -224,5 +236,13 @@ public class OAuth2Authenticator implements HttpHandler {
             WebUtil.sendNeedCode(post, 200);
             tokenDao.deleteById(id);
         }), plugin.getExecutorService());
+    }
+
+    public void completeWaiting() {
+        authSequence
+            .values()
+            .stream()
+            .map(Triple::getRight)
+            .forEach(future -> future.completeExceptionally(new IOException("OAuth2 Service is shutting down")));
     }
 }

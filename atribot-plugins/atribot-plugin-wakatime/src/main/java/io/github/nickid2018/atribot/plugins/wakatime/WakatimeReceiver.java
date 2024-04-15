@@ -10,6 +10,7 @@ import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
+import io.github.nickid2018.atribot.util.BaseExceptions;
 import io.github.nickid2018.atribot.util.FunctionUtil;
 import io.github.nickid2018.atribot.util.JsonUtil;
 import io.github.nickid2018.atribot.util.WebUtil;
@@ -74,8 +75,27 @@ public class WakatimeReceiver implements CommunicateReceiver {
                     manager,
                     target
                 );
+                case "revoke" -> revoke(backendID, manager, target);
             }
         }
+    }
+
+    private void revoke(String backendID, MessageManager manager, TargetData target) {
+        Communication.<Map<?, ?>, Void>communicateWithResult(
+            "atribot-plugin-oauth2-service",
+            "oauth2.revoke",
+            Map.of(
+                "oauthName", "wakatime",
+                "id", target.getTargetUser()
+            )
+        ).thenAcceptAsync(
+            v -> manager.sendMessage(backendID, target, MessageChain.text("已撤销授权")),
+            plugin.getExecutorService()
+        ).exceptionallyAsync(t -> {
+            log.error("Error in revoking", t);
+            manager.sendMessage(backendID, target, MessageChain.text("撤销授权时出现错误：" + t.getMessage()));
+            return null;
+        }, plugin.getExecutorService());
     }
 
     public void printSummary(String url, String backendID, MessageManager manager, TargetData targetData) {
@@ -150,7 +170,16 @@ public class WakatimeReceiver implements CommunicateReceiver {
         }, (t, e) -> {
             log.error("Error in fetching data", e);
             manager.sendMessage(backendID, targetData, MessageChain.text("获取数据时出现错误：" + e.getMessage()));
-        }), plugin.getExecutorService());
+        }), plugin.getExecutorService()).exceptionallyAsync(t -> {
+            t = t.getCause();
+            if (BaseExceptions.isGeneralTimeout(t)) {
+                manager.sendMessage(backendID, targetData, MessageChain.text("授权超时"));
+            } else {
+                log.error("Error in fetching data", t);
+                manager.sendMessage(backendID, targetData, MessageChain.text("授权错误：" + t.getMessage()));
+            }
+            return null;
+        }, plugin.getExecutorService());
     }
 
     @Override

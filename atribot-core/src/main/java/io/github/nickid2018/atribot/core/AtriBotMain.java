@@ -2,6 +2,7 @@ package io.github.nickid2018.atribot.core;
 
 import io.github.nickid2018.atribot.core.communicate.Communication;
 import io.github.nickid2018.atribot.core.message.MessageManager;
+import io.github.nickid2018.atribot.core.plugin.PluginClassLoader;
 import io.github.nickid2018.atribot.core.plugin.PluginManager;
 import io.github.nickid2018.atribot.util.ClassPathDependencyResolver;
 import io.github.nickid2018.atribot.util.Configuration;
@@ -24,9 +25,10 @@ public class AtriBotMain {
 
     @SneakyThrows
     public static void main(String[] args) {
-        if (System.getenv("DEV_PLUGIN") == null && ClassPathDependencyResolver.inProductionEnvironment())
+        if (System.getenv("DEV_PLUGIN") == null && ClassPathDependencyResolver.inProductionEnvironment(AtriBotMain.class))
             ClassPathDependencyResolver.resolveCoreDependencies();
 
+        PluginClassLoader.preloadAllClassesForCore();
         Configuration.init();
         MessageManager manager = new MessageManager();
         manager.start();

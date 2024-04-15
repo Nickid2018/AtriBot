@@ -29,7 +29,7 @@ public class OAuth2Server {
                     .build()
             ));
             httpServer.start();
-            log.info("OAuth2 Server started on port {}.", serverPort);
+            log.info("OAuth2 Server started on port {}", serverPort);
         } catch (IOException e) {
             log.error("Error starting OAuth2 Server", e);
             httpServer = null;
@@ -39,14 +39,21 @@ public class OAuth2Server {
     public void addHandler(String path, HttpHandler handler) {
         if (httpServer != null) {
             httpServer.createContext(path, handler);
-            log.info("Handler added to path {}.", path);
+            log.info("Handler added to path {}", path);
+        }
+    }
+
+    public void removeHandler(String oauthName) {
+        if (httpServer != null) {
+            httpServer.removeContext(oauthName);
+            log.info("Handler removed from path {}", oauthName);
         }
     }
 
     public void stopServer() {
         if (httpServer != null) {
             httpServer.stop(0);
-            log.info("OAuth2 Server stopped.");
+            log.info("OAuth2 Server stopped");
         }
     }
 }

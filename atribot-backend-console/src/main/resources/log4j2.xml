@@ -2,7 +2,10 @@
 <Configuration status="INFO">
 	<Appenders>
 		<Console name="SysOut" target="SYSTEM_OUT">
-			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
+			<PatternLayout
+					disableAnsi="false"
+					pattern="[%d{HH:mm:ss.SSS}] [%15.15t/%highlight{${LOG_LEVEL_PATTERN:-%5p}}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue}] [%style{%-25.25logger{1.}}{cyan}] %m%n%style{%xEx}{red}"
+			/>
 			<Filters>
 				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="DENY" onMismatch="NEUTRAL"/>
 				<ThresholdFilter level="INFO" onMatch="NEUTRAL" onMismatch="DENY"/>
@@ -10,7 +13,7 @@
 			</Filters>
 		</Console>
 		<RollingRandomAccessFile name="File" fileName="logs/latest.log" filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
-			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
+			<PatternLayout pattern="[%d{HH:mm:ss.SSS}] [%t/%level] [%logger]: %msg%n"/>
 			<Filters>
 				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="DENY" onMismatch="NEUTRAL"/>
 				<ThresholdFilter level="DEBUG" onMatch="NEUTRAL" onMismatch="DENY"/>
@@ -23,9 +26,9 @@
 			<DefaultRolloverStrategy max="50"/>
 		</RollingRandomAccessFile>
 		<File name="NetworkLog" fileName="logs/network.log" append="false">
-			<PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n"/>
+			<PatternLayout pattern="[%d{HH:mm:ss.SSS}] [%t/%level] [%logger]: %msg%n"/>
 			<Filters>
-				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="ACCEPT" onMismatch="DENY"/>
+				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="NEUTRAL" onMismatch="DENY"/>
 				<ThresholdFilter level="DEBUG" onMatch="NEUTRAL" onMismatch="DENY"/>
 			</Filters>
 		</File>

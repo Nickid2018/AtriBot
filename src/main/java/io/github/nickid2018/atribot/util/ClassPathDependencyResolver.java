@@ -27,8 +27,8 @@ public class ClassPathDependencyResolver {
         LIBRARY_PATH = new File(libraryPath);
     }
 
-    public static boolean inProductionEnvironment() {
-        return ClassPathDependencyResolver.class
+    public static boolean inProductionEnvironment(Class<?> thisClass) {
+        return thisClass
             .getProtectionDomain()
             .getCodeSource()
             .getLocation()
@@ -37,7 +37,7 @@ public class ClassPathDependencyResolver {
     }
 
     public static void resolveCoreDependencies() throws Throwable {
-        System.out.println("Loading dependencies");
+        System.out.println("Loading dependencies for core classes...");
 
         String jarPath = ClassPathDependencyResolver.class
             .getProtectionDomain()
@@ -59,8 +59,13 @@ public class ClassPathDependencyResolver {
         // Add command line argument: --add-opens java.base/jdk.internal.loader=ALL-UNNAMED
         ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
         Class<?> builtinClassLoaderClass = systemLoader.getClass();
-        MethodHandle addURL = MethodHandles.privateLookupIn(builtinClassLoaderClass, MethodHandles.lookup())
-            .findVirtual(builtinClassLoaderClass, "appendClassPath", MethodType.methodType(void.class, String.class));
+        MethodHandle addURL = MethodHandles
+            .privateLookupIn(builtinClassLoaderClass, MethodHandles.lookup())
+            .findVirtual(
+                builtinClassLoaderClass,
+                "appendClassPath",
+                MethodType.methodType(void.class, String.class)
+            );
         for (URL url : urls) {
             addURL.invoke(systemLoader, url.getFile());
         }
@@ -73,7 +78,7 @@ public class ClassPathDependencyResolver {
         try (ZipFile zipFile = new ZipFile(jarFile)) {
             ZipEntry entry = zipFile.getEntry("META-INF/DEPENDENCIES");
             if (entry == null) {
-                errorService.accept("No dependencies found in plugin jar!");
+                errorService.accept("No dependencies found in jar!");
                 return new URL[0];
             }
 

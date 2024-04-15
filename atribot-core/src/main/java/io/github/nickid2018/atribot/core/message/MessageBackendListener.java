@@ -42,7 +42,7 @@ public class MessageBackendListener implements NetworkListener {
                 packet.getMessageChain()
             );
             case MessageSentPacket packet -> manager.messageSent(packet.getUniqueID());
-            case QueuedMessageRequestPacket packet -> manager.clearQueue(connectionMap.get(connection));
+            case QueuedMessageRequestPacket ignored -> manager.clearQueue(connectionMap.get(connection));
             default -> throw new IllegalStateException("Unexpected value: " + msg);
         }
     }

@@ -20,7 +20,7 @@ public class ConsoleBackendMain {
 
     @SneakyThrows
     public static void main(String[] args) {
-        if (ClassPathDependencyResolver.inProductionEnvironment())
+        if (ClassPathDependencyResolver.inProductionEnvironment(ConsoleBackendMain.class))
             ClassPathDependencyResolver.resolveCoreDependencies();
 
         Configuration.init();

@@ -15,6 +15,7 @@ public class OAuth2Receiver implements CommunicateReceiver {
 
     private static final Set<String> communicateKeys = Set.of(
         "oauth2.register",
+        "oauth2.unregister",
         "oauth2.authenticate",
         "oauth2.revoke"
     );
@@ -30,6 +31,13 @@ public class OAuth2Receiver implements CommunicateReceiver {
             case "oauth2.register" -> registerOAuth2((Map<String, Object>) data);
             case "oauth2.authenticate" -> authenticate((Map<String, Object>) data);
             case "oauth2.revoke" -> revoke((Map<String, Object>) data);
+            case "oauth2.unregister" -> {
+                String oauthName = (String) data;
+                OAuth2Authenticator authenticator = authenticators.remove(oauthName);
+                authenticator.completeWaiting();
+                server.removeHandler(authenticator.getRedirect());
+                yield null;
+            }
             default -> null;
         };
     }
@@ -107,5 +115,9 @@ public class OAuth2Receiver implements CommunicateReceiver {
     @Override
     public Set<String> availableCommunicateKeys() {
         return communicateKeys;
+    }
+
+    public void onPluginUnload() {
+        authenticators.values().forEach(OAuth2Authenticator::completeWaiting);
     }
 }
