@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO">
+	<Appenders>
+		<Console name="SysOut" target="SYSTEM_OUT">
+			<PatternLayout
+					disableAnsi="false"
+					pattern="[%d{HH:mm:ss.SSS}] [%15.15t/%highlight{${LOG_LEVEL_PATTERN:-%5p}}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue}] [%style{%-25.25logger{1.}}{cyan}] %m%n%style{%xEx}{red}"
+			/>
+			<Filters>
+				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="DENY" onMismatch="NEUTRAL"/>
+				<ThresholdFilter level="INFO" onMatch="NEUTRAL" onMismatch="DENY"/>
+				<BurstFilter level="INFO" rate="16" maxBurst="100"/>
+			</Filters>
+		</Console>
+		<RollingRandomAccessFile name="File" fileName="logs/latest.log" filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
+			<PatternLayout pattern="[%d{HH:mm:ss.SSS}] [%t/%level] [%logger]: %msg%n"/>
+			<Filters>
+				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="DENY" onMismatch="NEUTRAL"/>
+				<ThresholdFilter level="DEBUG" onMatch="NEUTRAL" onMismatch="DENY"/>
+			</Filters>
+			<Policies>
+				<TimeBasedTriggeringPolicy/>
+				<OnStartupTriggeringPolicy/>
+				<SizeBasedTriggeringPolicy size="20 MB"/>
+			</Policies>
+			<DefaultRolloverStrategy max="50"/>
+		</RollingRandomAccessFile>
+		<File name="NetworkLog" fileName="logs/network.log" append="false">
+			<PatternLayout pattern="[%d{HH:mm:ss.SSS}] [%t/%level] [%logger]: %msg%n"/>
+			<Filters>
+				<MarkerFilter marker="ATRIBOT_NETWORK" onMatch="NEUTRAL" onMismatch="DENY"/>
+				<ThresholdFilter level="DEBUG" onMatch="NEUTRAL" onMismatch="DENY"/>
+			</Filters>
+		</File>
+	</Appenders>
+	<Loggers>
+		<Logger name="io.netty" level="ERROR"/>
+		<Root level="DEBUG">
+			<AppenderRef ref="SysOut"/>
+			<AppenderRef ref="File"/>
+			<AppenderRef ref="NetworkLog"/>
+		</Root>
+	</Loggers>
+</Configuration>

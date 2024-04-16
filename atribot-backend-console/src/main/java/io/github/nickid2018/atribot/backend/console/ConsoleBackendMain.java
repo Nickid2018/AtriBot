@@ -27,7 +27,7 @@ public class ConsoleBackendMain {
 
         ConsoleBackendListener listener = new ConsoleBackendListener();
         BackendClient client = new BackendClient(listener);
-        listener.setTransactionQueue(new TransactionQueue(client.getConnection()));
+        listener.setTransactionQueue(new TransactionQueue(client::getConnection));
         PacketRegister.registerBackendPackets(client);
         client.setAutoReconnect(true);
         client.connect(

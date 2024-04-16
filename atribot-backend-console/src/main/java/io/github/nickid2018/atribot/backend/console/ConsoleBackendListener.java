@@ -18,23 +18,23 @@ public class ConsoleBackendListener implements NetworkListener {
     public void setTransactionQueue(TransactionQueue transactionQueue) {
         this.transactionQueue = transactionQueue;
         transactionQueue.registerTransactionConsumer(
-                ImageResolveStartPacket.class,
-                packet -> transactionQueue
-                        .getConnection()
-                        .sendPacket(new StopTransactionPacket(packet.getTransactionId()))
+            ImageResolveStartPacket.class,
+            packet -> transactionQueue
+                .getConnection().get()
+                .sendPacket(new StopTransactionPacket(packet.getTransactionId()))
         );
     }
 
     @Override
     public void connectionOpened(Connection connection) {
         connection.sendPacket(new BackendBasicInformationPacket(
-                "console",
-                "1.0",
-                Map.of(
-                        "forwardMessageSupport", "false",
-                        "selfId", "console",
-                        "prefixCommand", ""
-                )
+            "console",
+            "1.0",
+            Map.of(
+                "forwardMessageSupport", "false",
+                "selfId", "console",
+                "prefixCommand", ""
+            )
         ));
         connection.sendPacket(QueuedMessageRequestPacket.INSTANCE);
         log.info("Connection opened");

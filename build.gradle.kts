@@ -57,15 +57,15 @@ subprojects {
     }
 
     fun isPluginProject(): Boolean {
-        return project.configurations.compileClasspath.get().resolvedConfiguration.resolvedArtifacts
+        return project.configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
             .any { it.id.componentIdentifier.displayName == "project :atribot-core" }
     }
 
     tasks.register("generateDependenciesFile") {
-        val dependenciesData = project.configurations.compileClasspath.get().resolvedConfiguration.resolvedArtifacts
+        val dependenciesData = project.configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
 
         val coreDependenciesFileData = if (isPluginProject()) {
-            project(":atribot-core").configurations.compileClasspath.get()
+            project(":atribot-core").configurations.runtimeClasspath.get()
                 .resolvedConfiguration.resolvedArtifacts
                 .filter { it.type == "jar" }
         } else {
@@ -77,6 +77,7 @@ subprojects {
             .filter { it.type == "jar" }
             .filter { !isPluginProject() || !coreDependenciesFileData.contains(it) }
             .map { it.id.componentIdentifier.displayName }
+            .filter { !it.startsWith("project") }
             .sorted()
             .joinToString("\n") { it }
 

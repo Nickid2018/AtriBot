@@ -8,6 +8,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -17,6 +18,7 @@ import java.util.zip.ZipFile;
 public class ClassPathDependencyResolver {
 
     public static final File LIBRARY_PATH;
+    public static final Set<String> repositoryMap = new HashSet<>();
 
     static {
         String libraryPath = System.getenv("LIBRARY_PATH");
@@ -25,6 +27,13 @@ public class ClassPathDependencyResolver {
         if (libraryPath == null)
             libraryPath = "libraries";
         LIBRARY_PATH = new File(libraryPath);
+
+        repositoryMap.add("https://repo1.maven.org/maven2/");
+        repositoryMap.add("https://maven.nova-committee.cn/releases/");
+
+        String repository = System.getenv("REPOSITORY");
+        if (repository != null)
+            repositoryMap.addAll(Arrays.asList(repository.split(";")));
     }
 
     public static boolean inProductionEnvironment(Class<?> thisClass) {
@@ -44,10 +53,6 @@ public class ClassPathDependencyResolver {
             .getCodeSource()
             .getLocation()
             .getPath();
-        if (!jarPath.endsWith(".jar")) {
-            System.err.println("The class is not running in a jar file! Is this a development environment?");
-            System.exit(1);
-        }
 
         URL[] urls = resolveDependencies(
             new File(jarPath),
@@ -66,9 +71,8 @@ public class ClassPathDependencyResolver {
                 "appendClassPath",
                 MethodType.methodType(void.class, String.class)
             );
-        for (URL url : urls) {
+        for (URL url : urls)
             addURL.invoke(systemLoader, url.getFile());
-        }
     }
 
     public static URL[] resolveDependencies(File jarFile, Consumer<String> debugService, Consumer<String> loggerService, Consumer<String> errorService) throws IOException {
@@ -87,7 +91,13 @@ public class ClassPathDependencyResolver {
             for (String dep : depList) {
                 if (dep.isEmpty())
                     continue;
+
                 String[] depInfo = dep.split(":");
+                if (depInfo.length < 3 || depInfo.length > 4) {
+                    errorService.accept("Invalid dependency format: %s".formatted(dep));
+                    continue;
+                }
+
                 String depGroup = depInfo[0];
                 String depName = depInfo[1];
                 String depVersion = depInfo[2];
@@ -109,30 +119,52 @@ public class ClassPathDependencyResolver {
                 );
 
                 File depFile = new File(LIBRARY_PATH, path);
-                while (!checkFileValid(depFile.getAbsolutePath())) {
+                File verifyFile = new File(depFile.getAbsolutePath() + ".md5");
+                int retry = 0;
+                while (!checkFileValid(depFile.getAbsolutePath()) && retry < 3) {
+                    errorService.accept("Dependency %s is invalid in the file system".formatted(depFile.getName()));
                     depFile.getParentFile().mkdirs();
-                    URI md5 = URI.create("https://repo1.maven.org/maven2/%s.md5".formatted(path));
-                    URI jar = URI.create("https://repo1.maven.org/maven2/%s".formatted(path));
-                    loggerService.accept("Downloading dependency %s".formatted(dep));
-                    try (
-                        InputStream md5Stream = md5.toURL().openStream();
-                        InputStream jarStream = jar.toURL().openStream()
-                    ) {
-                        depFile.createNewFile();
-                        try (FileOutputStream fileStream = new FileOutputStream(depFile)) {
-                            fileStream.write(jarStream.readAllBytes());
+
+                    boolean found = false;
+                    for (String repoURL : repositoryMap) {
+                        if (found)
+                            break;
+                        if (!repoURL.endsWith("/"))
+                            repoURL += "/";
+
+                        URI md5 = URI.create("%s%s.md5".formatted(repoURL, path));
+                        URI jar = URI.create("%s%s".formatted(repoURL, path));
+                        loggerService.accept("Downloading dependency %s".formatted(dep));
+                        try (
+                            InputStream md5Stream = md5.toURL().openStream();
+                            InputStream jarStream = jar.toURL().openStream()
+                        ) {
+                            depFile.createNewFile();
+                            try (FileOutputStream fileStream = new FileOutputStream(depFile)) {
+                                fileStream.write(jarStream.readAllBytes());
+                            }
+                            try (FileWriter writer = new FileWriter(depFile.getAbsolutePath() + ".md5")) {
+                                writer.write(new String(md5Stream.readAllBytes(), StandardCharsets.UTF_8));
+                            }
+                            found = true;
+                        } catch (Exception e) {
+                            depFile.delete();
+                            verifyFile.delete();
                         }
-                        try (FileWriter writer = new FileWriter(depFile.getAbsolutePath() + ".md5")) {
-                            writer.write(new String(md5Stream.readAllBytes(), StandardCharsets.UTF_8));
-                        }
-                    } catch (Exception e) {
-                        errorService.accept("Error downloading dependency %s: %s:%s".formatted(
-                            depFile.getName(),
-                            e.getClass().getName(),
-                            e.getMessage()
-                        ));
-                        depFile.delete();
                     }
+
+                    if (found)
+                        break;
+                    else
+                        errorService.accept("Failed to download dependency %s for %d time(s)".formatted(
+                            depFile.getName(),
+                            ++retry
+                        ));
+                }
+
+                if (retry >= 3) {
+                    errorService.accept("Dependency %s is not found in repositories".formatted(depFile.getName()));
+                    System.exit(-1);
                 }
 
                 debugService.accept("Dependency %s is valid".formatted(depFile.getName()));

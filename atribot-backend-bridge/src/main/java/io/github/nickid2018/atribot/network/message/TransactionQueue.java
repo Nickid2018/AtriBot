@@ -15,13 +15,14 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 @Slf4j
 @RequiredArgsConstructor
 public class TransactionQueue {
 
     @Getter
-    private final Connection connection;
+    private final Supplier<Connection> connection;
     private final Map<String, Consumer<? extends TransactionPacket<?>>> transactionMap = new HashMap<>();
     private final Map<Class<? extends TransactionPacket<?>>, Consumer<? extends TransactionPacket<?>>> transactionConsumerMap = new HashMap<>();
     private final ExecutorService transactionExecutor = Executors.newThreadPerTaskExecutor(
@@ -42,7 +43,7 @@ public class TransactionQueue {
         while (transactionMap.containsKey(packet.getTransactionId()))
             packet.setTransactionId(UUID.randomUUID().toString());
         transactionMap.put(packet.getTransactionId(), consumer);
-        connection.sendPacket(packet);
+        connection.get().sendPacket(packet);
     }
 
     @SuppressWarnings("unchecked")

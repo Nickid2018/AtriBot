@@ -15,3 +15,4 @@ includeProject("atribot-plugin-oauth2-service", "atribot-plugins/atribot-plugin-
 
 // Backends Here
 includeProject("atribot-backend-console") // Test Console Backend
+includeProject("atribot-backend-onebot")

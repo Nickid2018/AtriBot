@@ -27,16 +27,13 @@ public class TestPlugin implements AtriBotPlugin {
 
     @Override
     public void onPluginPreload() {
-        log.info("Test plugin preloaded!");
     }
 
     @Override
     public void onPluginLoad() {
-        log.info("Test plugin loaded!");
     }
 
     @Override
     public void onPluginUnload() {
-        log.info("Test plugin unloaded!");
     }
 }

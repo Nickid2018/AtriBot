@@ -1,8 +1,8 @@
 package io.github.nickid2018.atribot.core.communicate;
 
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 
 public interface CommunicateReceiver {
 
@@ -13,12 +13,13 @@ public interface CommunicateReceiver {
     CommunicateReceiver NOP = new CommunicateReceiver() {
         @Override
         public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) {
-            return CompletableFuture.completedFuture(null);
+            return null;
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public Set<String> availableCommunicateKeys() {
-            return Set.of();
+            return Collections.EMPTY_SET;
         }
     };
 }

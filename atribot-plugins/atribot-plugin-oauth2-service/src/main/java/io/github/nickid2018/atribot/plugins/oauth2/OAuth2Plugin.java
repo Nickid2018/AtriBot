@@ -16,10 +16,10 @@ public class OAuth2Plugin extends AbstractAtriBotPlugin {
     public PluginInfo getPluginInfo() {
         return new PluginInfo(
             "atribot-plugin-oauth2-service",
-            "OAuth2",
+            "OAuth 2.0",
             "1.0",
             "Nickid2018",
-            "A plugin for OAuth2"
+            "A plugin for OAuth 2.0"
         );
     }
 
