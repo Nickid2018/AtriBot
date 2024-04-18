@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
-@SuppressWarnings("unused")
 public class WakatimePlugin extends AbstractAtriBotPlugin {
 
     private static final Logger log = LoggerFactory.getLogger(WakatimePlugin.class);

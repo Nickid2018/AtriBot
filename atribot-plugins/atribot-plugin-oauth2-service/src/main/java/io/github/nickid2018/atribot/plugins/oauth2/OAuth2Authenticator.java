@@ -51,8 +51,13 @@ public class OAuth2Authenticator implements HttpHandler {
 
     @Override
     @SneakyThrows
-    public void handle(HttpExchange exchange) throws IOException {
+    public void handle(HttpExchange exchange) {
         String query = exchange.getRequestURI().getQuery();
+        if (query == null) {
+            exchange.sendResponseHeaders(204, -1);
+            return;
+        }
+
         Map<String, String> args = Arrays
             .stream(query.split("&"))
             .map(s -> s.split("=", 2))
@@ -61,52 +66,57 @@ public class OAuth2Authenticator implements HttpHandler {
             );
         String state = args.get("state");
 
+        log.debug("Received OAuth2 callback with state: {}", state);
         if (authSequence.containsKey(state)) {
             String success = """
                              <!DOCTYPE HTML><body><div style="text-align: center">Authenticated successfully</body>
                              """;
-            exchange.sendResponseHeaders(200, success.length());
-            exchange.getResponseBody().write(success.getBytes(StandardCharsets.UTF_8));
-            exchange.close();
+            byte[] data = success.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, data.length);
+            exchange.getResponseBody().write(data);
 
-            String code = args.get("code");
-            HttpPost post = new HttpPost(tokenGrantURL);
-            post.setHeader("Accept", "application/json");
+            plugin.getExecutorService().execute(FunctionUtil.noException(() -> {
+                String code = args.get("code");
+                HttpPost post = new HttpPost(tokenGrantURL);
+                post.setHeader("Accept", "application/json");
 
-            List<NameValuePair> pairs = new ArrayList<>();
-            if (uriAppend) {
-                String localIP = Configuration.getStringOrElse("network.local_ip", "localhost");
-                int serverPort = Configuration.getIntOrElse("oauth2.server.port", 8080);
-                pairs.add(new BasicNameValuePair(
-                    "redirect_uri",
-                    "http://%s:%d%s".formatted(localIP, serverPort, redirect)
-                ));
-            }
-            pairs.add(new BasicNameValuePair("code", code));
-            pairs.add(new BasicNameValuePair("client_id", clientID));
-            pairs.add(new BasicNameValuePair("client_secret", clientSecret));
-            pairs.add(new BasicNameValuePair("grant_type", "authorization_code"));
+                List<NameValuePair> pairs = new ArrayList<>();
+                if (uriAppend) {
+                    pairs.add(new BasicNameValuePair(
+                        "redirect_uri",
+                        "%s%s".formatted(Configuration.getStringOrElse("network.export", "localhost"), redirect)
+                    ));
+                }
+                pairs.add(new BasicNameValuePair("code", code));
+                pairs.add(new BasicNameValuePair("client_id", clientID));
+                pairs.add(new BasicNameValuePair("client_secret", clientSecret));
+                pairs.add(new BasicNameValuePair("grant_type", "authorization_code"));
 
-            UrlEncodedFormEntity entity = new UrlEncodedFormEntity(pairs, StandardCharsets.UTF_8);
-            post.setEntity(entity);
+                UrlEncodedFormEntity entity = new UrlEncodedFormEntity(pairs, StandardCharsets.UTF_8);
+                post.setEntity(entity);
 
-            JsonObject object = WebUtil.fetchDataInJson(post).getAsJsonObject();
-            String accessToken = JsonUtil.getStringOrNull(object, "access_token");
-            Triple<String, List<String>, CompletableFuture<String>> authData = authSequence.remove(state);
+                JsonObject object = WebUtil.fetchDataInJson(post).getAsJsonObject();
+                String accessToken = JsonUtil.getStringOrNull(object, "access_token");
+                Triple<String, List<String>, CompletableFuture<String>> authData = authSequence.remove(state);
 
-            long expiredTime = JsonUtil.getIntOrZero(object, "expires_in") * 1000L + System.currentTimeMillis();
-            AuthenticateToken token = new AuthenticateToken(
-                authData.getLeft(),
-                accessToken,
-                expiredTime,
-                JsonUtil.getStringOrNull(object, "refresh_token"),
-                String.join(";", authData.getMiddle())
-            );
-            tokenDao.createOrUpdate(token);
-            authData.getRight().complete(accessToken);
+                long expiredTime = JsonUtil.getIntOrZero(object, "expires_in") * 1000L + System.currentTimeMillis();
+                AuthenticateToken token = new AuthenticateToken(
+                    authData.getLeft(),
+                    accessToken,
+                    expiredTime,
+                    JsonUtil.getStringOrNull(object, "refresh_token"),
+                    String.join(";", authData.getMiddle())
+                );
+                tokenDao.createOrUpdate(token);
+                authData.getRight().complete(accessToken);
+            }));
         } else {
-            exchange.sendResponseHeaders(400, 0);
-            exchange.close();
+            String fail = """
+                          <!DOCTYPE HTML><body><div style="text-align: center; color: red">Authentication failed</body>
+                          """;
+            byte[] data = fail.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(400, data.length);
+            exchange.getResponseBody().write(data);
         }
     }
 
@@ -132,11 +142,9 @@ public class OAuth2Authenticator implements HttpHandler {
                 pairs.add(new BasicNameValuePair("refresh_token", token.refreshToken));
 
                 if (uriAppend) {
-                    String localIP = Configuration.getStringOrElse("network.local_ip", "localhost");
-                    int serverPort = Configuration.getIntOrElse("oauth2.server.port", 8080);
                     pairs.add(new BasicNameValuePair(
                         "redirect_uri",
-                        "http://%s:%d%s".formatted(localIP, serverPort, redirect)
+                        "%s%s".formatted(Configuration.getStringOrElse("network.export", "localhost"), redirect)
                     ));
                 }
 
@@ -181,9 +189,10 @@ public class OAuth2Authenticator implements HttpHandler {
         );
 
         if (uriAppend) {
-            String localIP = Configuration.getStringOrElse("network.local_ip", "localhost");
-            int serverPort = Configuration.getIntOrElse("oauth2.server.port", 8080);
-            url += "&redirect_uri=http://%s:%d%s".formatted(localIP, serverPort, redirect);
+            url += "&redirect_uri=%s%s".formatted(
+                Configuration.getStringOrElse("network.export", "localhost"),
+                redirect
+            );
         }
 
         String extra = extraParameters

@@ -10,6 +10,7 @@ import java.net.URI;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
+@ToString
 public class ImageMessage implements Message {
 
     private String imgKey;

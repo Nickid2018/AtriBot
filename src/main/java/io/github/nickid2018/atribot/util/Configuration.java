@@ -66,9 +66,25 @@ public class Configuration {
         return current;
     }
 
+    public static boolean hasKey(String key) {
+        return getObject(key) != null;
+    }
+
     public static int getIntOrElse(String key, int defaultValue) {
         Object obj = getObject(key);
         return obj instanceof Integer ? (int) obj : defaultValue;
+    }
+
+    public static int getLongOrElse(String key, int defaultValue) {
+        Object obj = getObject(key);
+        return obj instanceof Long ? (int) obj : defaultValue;
+    }
+
+    public static <E extends Throwable> long getLongOrThrow(String key, Supplier<E> supplier) throws E {
+        Object obj = getObject(key);
+        if (obj instanceof String)
+            return Long.parseLong((String) obj);
+        throw supplier.get();
     }
 
     public static <E extends Throwable> int getIntOrThrow(String key, Supplier<E> supplier) throws E {

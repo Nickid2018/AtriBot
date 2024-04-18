@@ -4,6 +4,7 @@ import io.github.nickid2018.atribot.network.packet.PacketBuffer;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.function.Consumer;
 @Getter
 @NoArgsConstructor
 @EqualsAndHashCode
+@ToString
 public class MessageChain implements Message {
 
     private final List<Message> messages = new ArrayList<>();

@@ -9,3 +9,9 @@ dependencies {
    api(project(":atribot-backend-bridge"))
    implementation("cn.evole.onebot:OneBot-Client:0.4.0")
 }
+
+tasks.jar {
+   manifest {
+      attributes["Main-Class"] = "io.github.nickid2018.atribot.backend.onebot.OnebotBackendMain"
+   }
+}

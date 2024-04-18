@@ -1,7 +1,9 @@
 package io.github.nickid2018.atribot.network.message;
 
 import io.github.nickid2018.atribot.network.packet.PacketBuffer;
+import lombok.ToString;
 
+@ToString
 public class UnsupportedMessage implements Message {
 
     public static final UnsupportedMessage INSTANCE = new UnsupportedMessage();

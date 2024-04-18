@@ -18,6 +18,7 @@ public class OAuth2Server {
     public void startServer() {
         int serverPort = Configuration.getIntOrElse("oauth2.server.port", 8080);
         try {
+            log.info("Starting OAuth2 Server on port {}", serverPort);
             httpServer = HttpServer.create(new InetSocketAddress(serverPort), 0);
             httpServer.setExecutor(Executors.newCachedThreadPool(
                 new ThreadFactoryBuilder()
@@ -43,10 +44,10 @@ public class OAuth2Server {
         }
     }
 
-    public void removeHandler(String oauthName) {
+    public void removeHandler(String path) {
         if (httpServer != null) {
-            httpServer.removeContext(oauthName);
-            log.info("Handler removed from path {}", oauthName);
+            httpServer.removeContext(path);
+            log.info("Handler removed from path {}", path);
         }
     }
 

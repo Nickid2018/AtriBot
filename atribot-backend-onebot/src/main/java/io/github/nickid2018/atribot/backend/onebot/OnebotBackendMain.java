@@ -23,8 +23,21 @@ public class OnebotBackendMain {
 
         BotConfig config = new BotConfig();
         config.setReconnect(true);
-        OneBotClient client = OneBotClient.create(config);
+        config.setBotId(Configuration.getLongOrThrow(
+            "onebot.bot_id",
+            () -> new IllegalArgumentException("Please set onebot.bot_id in configuration file!")
+        ));
+        config.setUrl(Configuration.getStringOrThrow(
+            "onebot.url",
+            () -> new IllegalArgumentException("Please set onebot.url in configuration file!")
+        ));
+        boolean accessToken = Configuration.hasKey("onebot.access_token");
+        if (accessToken) {
+            config.setAccessToken(true);
+            config.setToken(Configuration.getString("onebot.access_token"));
+        }
 
+        OneBotClient client = OneBotClient.create(config).open();
         OnebotBackendListener listener = new OnebotBackendListener(client);
         BackendClient backendClient = new BackendClient(listener);
         listener.setClient(backendClient);
