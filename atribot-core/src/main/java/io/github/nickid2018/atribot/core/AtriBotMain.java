@@ -8,21 +8,10 @@ import io.github.nickid2018.atribot.util.ClassPathDependencyResolver;
 import io.github.nickid2018.atribot.util.Configuration;
 import lombok.SneakyThrows;
 
-import java.io.File;
 import java.util.Scanner;
 
 
 public class AtriBotMain {
-
-    public static final File LIBRARY_PATH;
-
-    static {
-        String libraryPath = System.getenv("LIBRARY_PATH");
-        if (libraryPath == null)
-            libraryPath = "/libraries";
-        LIBRARY_PATH = new File(libraryPath);
-    }
-
     @SneakyThrows
     public static void main(String[] args) {
         if (System.getenv("DEV_PLUGIN") == null && ClassPathDependencyResolver.inProductionEnvironment(AtriBotMain.class))
@@ -30,6 +19,13 @@ public class AtriBotMain {
 
         PluginClassLoader.preloadAllClassesForCore();
         Configuration.init();
+        if (Configuration.hasKey("proxy")) {
+            System.setProperty("http.proxyHost", Configuration.getStringOrElse("proxy.host", "localhost"));
+            System.setProperty("http.proxyPort", String.valueOf(Configuration.getIntOrElse("proxy.port", 7890)));
+            System.setProperty("https.proxyHost", Configuration.getStringOrElse("proxy.host", "localhost"));
+            System.setProperty("https.proxyPort", String.valueOf(Configuration.getIntOrElse("proxy.port", 7890)));
+        }
+
         MessageManager manager = new MessageManager();
         manager.start();
 

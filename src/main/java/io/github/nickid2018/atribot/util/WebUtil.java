@@ -13,6 +13,9 @@ import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Random;
 
 @Slf4j
@@ -107,12 +110,16 @@ public class WebUtil {
     }
 
     public static String fetchDataInText(HttpUriRequest request, boolean ignoreErrorCode) throws IOException {
+        return fetchDataInText(request, chooseRandomUA(), ignoreErrorCode);
+    }
+
+    public static String fetchDataInText(HttpUriRequest request, String UA, boolean ignoreErrorCode) throws IOException {
         try (
             CloseableHttpClient httpClient = HttpClientBuilder
                 .create()
                 .disableCookieManagement()
                 .useSystemProperties()
-                .setUserAgent(chooseRandomUA())
+                .setUserAgent(UA)
                 .build()
         ) {
             return httpClient.execute(request, httpResponse -> {
@@ -140,5 +147,18 @@ public class WebUtil {
                 return httpResponse.getHeaders("location")[0].getValue();
             });
         }
+    }
+
+    public static String encode(String text) {
+        return URLEncoder.encode(text, StandardCharsets.UTF_8);
+    }
+
+    public static String formatQuery(Map<String, String> map) {
+        return "?" + String.join(
+            "&",
+            map.entrySet().stream()
+               .map(entry -> encode(entry.getKey()) + "=" + encode(entry.getValue()))
+               .toList()
+        );
     }
 }

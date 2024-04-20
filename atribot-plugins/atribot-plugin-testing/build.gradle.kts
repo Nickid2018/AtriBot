@@ -5,6 +5,7 @@ dependencies {
     api(project(":atribot-core"))
     api(project(":atribot-plugin-wakatime"))
     api(project(":atribot-plugin-oauth2-service"))
+    api(project(":atribot-plugin-wiki"))
 }
 
 tasks.register<JavaExec>("run") {
@@ -12,6 +13,7 @@ tasks.register<JavaExec>("run") {
     classpath = sourceSets["main"].runtimeClasspath
     workingDir = file("../../run")
     standardInput = System.`in`
+    systemProperties["java.net.useSystemProxies"] = "true"
     environment("DEV_PLUGIN", "true")
 }.configure {
     dependsOn(":atribot-core:classes")

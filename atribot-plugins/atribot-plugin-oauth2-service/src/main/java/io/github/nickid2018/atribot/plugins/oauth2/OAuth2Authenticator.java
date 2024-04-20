@@ -169,9 +169,10 @@ public class OAuth2Authenticator implements HttpHandler {
                         );
                         tokenDao.createOrUpdate(refreshed);
                         return accessToken;
-                    }), plugin.getExecutorService()).exceptionallyAsync(FunctionUtil.noException(t -> {
-                        return authenticateCode(backendID, target, manager, scopes, extraParameters).get();
-                    }), plugin.getExecutorService());
+                    }), plugin.getExecutorService()).exceptionallyComposeAsync(
+                        t -> authenticateCode(backendID, target, manager, scopes, extraParameters),
+                        plugin.getExecutorService()
+                    );
             }
             return authenticateCode(backendID, target, manager, scopes, extraParameters);
         } catch (Exception e) {

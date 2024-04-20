@@ -1,54 +1,54 @@
-package io.github.nickid2018.atribot.plugins.oauth2;
+package io.github.nickid2018.atribot.plugins.wiki;
 
+import com.j256.ormlite.dao.Dao;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
-import io.github.nickid2018.atribot.core.communicate.Communication;
 import io.github.nickid2018.atribot.core.database.DatabaseManager;
 import io.github.nickid2018.atribot.core.plugin.AbstractAtriBotPlugin;
 import io.github.nickid2018.atribot.core.plugin.PluginInfo;
+import io.github.nickid2018.atribot.plugins.wiki.persist.StartWikiEntry;
+import io.github.nickid2018.atribot.plugins.wiki.persist.WikiEntry;
+import io.github.nickid2018.atribot.plugins.wiki.resolve.InterwikiStorage;
 import io.github.nickid2018.atribot.util.Configuration;
 
-public class OAuth2Plugin extends AbstractAtriBotPlugin {
+public class WikiPlugin extends AbstractAtriBotPlugin {
 
     public DatabaseManager databaseManager;
-    public OAuth2Server server = new OAuth2Server();
-    public OAuth2Receiver receiver = new OAuth2Receiver(this, server);
+    public Dao<StartWikiEntry, String> startWikis;
+    public Dao<WikiEntry, ?> wikiEntries;
+
+    private WikiResolver resolver;
 
     @Override
     public PluginInfo getPluginInfo() {
         return new PluginInfo(
-            "atribot-plugin-oauth2-service",
-            "OAuth 2.0",
+            "atribot-plugin-wiki",
+            "Wiki",
             "1.0",
             "Nickid2018",
-            "A plugin for OAuth 2.0"
+            "A plugin to search wiki pages"
         );
     }
 
     @Override
     public CommunicateReceiver getCommunicateReceiver() {
-        return receiver;
+        return resolver;
     }
 
     @Override
     public void onPluginPreload() throws Exception {
         super.onPluginPreload();
         databaseManager = new DatabaseManager(Configuration.getStringOrElse(
-            "database.oauth2",
-            "database/oauth2.db"
+            "database.wiki",
+            "database/wiki.db"
         ));
-        server.startServer();
-    }
-
-    @Override
-    public void onPluginLoad() {
-        Communication.communicate("oauth2.service.started", null);
+        startWikis = databaseManager.getTable(StartWikiEntry.class);
+        wikiEntries = databaseManager.getTable(WikiEntry.class);
+        resolver = new WikiResolver(this, new InterwikiStorage(this));
     }
 
     @Override
     public void onPluginUnload() throws Exception {
-        server.stopServer();
         databaseManager.close();
-        Communication.communicate("oauth2.service.stopped", null);
         super.onPluginUnload();
     }
 }

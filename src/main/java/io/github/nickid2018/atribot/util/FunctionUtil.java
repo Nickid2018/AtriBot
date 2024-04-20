@@ -48,6 +48,20 @@ public class FunctionUtil {
         };
     }
 
+    public static <S, T> Function<S, T> tryUntil(FunctionWithException<S, T, ?> function, int times) {
+        return s -> {
+            for (int i = 0; i < times; i++) {
+                try {
+                    return function.apply(s);
+                } catch (Throwable e) {
+                    if (i == times - 1)
+                        throw new RuntimeException(e);
+                }
+            }
+            return null;
+        };
+    }
+
     public static <S, T> Function<S, T> noException(FunctionWithException<S, T, ?> function) {
         return noException(function, RuntimeException::new);
     }
@@ -93,6 +107,20 @@ public class FunctionUtil {
             } catch (Throwable e) {
                 exceptionCase.accept(t, e);
             }
+        };
+    }
+
+    public static <T> Supplier<T> tryUntil(SupplierWithException<T, ?> supplier, int times) {
+        return () -> {
+            for (int i = 0; i < times; i++) {
+                try {
+                    return supplier.get();
+                } catch (Throwable e) {
+                    if (i == times - 1)
+                        throw new RuntimeException(e);
+                }
+            }
+            return null;
         };
     }
 
