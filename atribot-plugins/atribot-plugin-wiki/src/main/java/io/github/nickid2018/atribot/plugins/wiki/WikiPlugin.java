@@ -14,7 +14,7 @@ public class WikiPlugin extends AbstractAtriBotPlugin {
 
     public DatabaseManager databaseManager;
     public Dao<StartWikiEntry, String> startWikis;
-    public Dao<WikiEntry, ?> wikiEntries;
+    public Dao<WikiEntry, Object> wikiEntries;
 
     private WikiResolver resolver;
 

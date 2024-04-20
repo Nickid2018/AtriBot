@@ -1,5 +1,6 @@
 package io.github.nickid2018.atribot.plugins.wiki;
 
+import com.j256.ormlite.stmt.DeleteBuilder;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
@@ -22,37 +23,60 @@ import java.util.concurrent.CompletableFuture;
 @AllArgsConstructor
 public class WikiResolver implements CommunicateReceiver {
 
-    private static final Set<String> KEYS = Set.of(
-        "atribot.message.command",
-        "atribot.message.normal"
-    );
+    private static final Set<String> KEYS = Set.of("atribot.message.command", "atribot.message.normal");
 
     private final WikiPlugin plugin;
     private final InterwikiStorage interwikiStorage;
 
     @Override
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) throws Exception {
+    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) {
         if (communicateKey.equals("atribot.message.command")) {
             CommandCommunicateData commandData = (CommandCommunicateData) data;
             switch (commandData.commandHead) {
-                case "wiki" -> plugin.getExecutorService().execute(noException(() -> requestWikiPage(
-                    commandData.commandArgs,
+                case "wiki" -> plugin.getExecutorService().execute(noException(
+                    () -> requestWikiPage(
+                        commandData.commandArgs,
+                        commandData.backendID,
+                        commandData.targetData,
+                        commandData.messageManager
+                    ),
                     commandData.backendID,
                     commandData.targetData,
                     commandData.messageManager
-                ), commandData.backendID, commandData.targetData, commandData.messageManager));
-                case "wikiadd" -> plugin.getExecutorService().execute(noException(() -> addWiki(
-                    commandData.commandArgs,
+                ));
+                case "wikiadd" -> plugin.getExecutorService().execute(noException(
+                    () -> addWiki(
+                        commandData.commandArgs,
+                        commandData.backendID,
+                        commandData.targetData,
+                        commandData.messageManager
+                    ),
                     commandData.backendID,
                     commandData.targetData,
                     commandData.messageManager
-                ), commandData.backendID, commandData.targetData, commandData.messageManager));
-                case "wikistart" -> plugin.getExecutorService().execute(noException(() -> setStartWiki(
-                    commandData.commandArgs,
+                ));
+                case "wikistart" -> plugin.getExecutorService().execute(noException(
+                    () -> setStartWiki(
+                        commandData.commandArgs,
+                        commandData.backendID,
+                        commandData.targetData,
+                        commandData.messageManager
+                    ),
                     commandData.backendID,
                     commandData.targetData,
                     commandData.messageManager
-                ), commandData.backendID, commandData.targetData, commandData.messageManager));
+                ));
+                case "wikiremove" -> plugin.getExecutorService().execute(noException(
+                    () -> removeWiki(
+                        commandData.commandArgs,
+                        commandData.backendID,
+                        commandData.targetData,
+                        commandData.messageManager
+                    ),
+                    commandData.backendID,
+                    commandData.targetData,
+                    commandData.messageManager
+                ));
                 default -> {
                 }
             }
@@ -60,15 +84,15 @@ public class WikiResolver implements CommunicateReceiver {
         return null;
     }
 
-    private Runnable noException(FunctionUtil.RunnableWithException<? extends Throwable> runnable,
-        String backendID, TargetData targetData, MessageManager manager) {
-        return FunctionUtil.noExceptionOrElse(
-            runnable,
-            e -> {
-                manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：查询页面时出现错误"));
-                log.error("Error when querying wiki page", e);
-            }
-        );
+    private Runnable noException(FunctionUtil.RunnableWithException<? extends Throwable> runnable, String backendID, TargetData targetData, MessageManager manager) {
+        return FunctionUtil.noExceptionOrElse(runnable, e -> {
+            manager.sendMessage(
+                backendID,
+                targetData,
+                MessageChain.text("Wiki：操作时出现错误，错误报告如下\n" + e.getMessage())
+            );
+            log.error("Error when querying wiki page", e);
+        });
     }
 
     @SneakyThrows
@@ -85,12 +109,16 @@ public class WikiResolver implements CommunicateReceiver {
         entry.wikiPrefix = wikiName;
         entry.baseURL = wikiURL;
 
-        plugin.wikiEntries
-            .queryForEq("group", entry.group)
-            .stream()
-            .filter(en -> en.wikiPrefix.equals(wikiName))
-            .findFirst()
-            .ifPresent(FunctionUtil.<WikiEntry>noException(plugin.wikiEntries::delete));
+        DeleteBuilder<WikiEntry, Object> deleteBuilder = plugin.wikiEntries.deleteBuilder();
+        deleteBuilder.setWhere(
+            plugin.wikiEntries
+                .queryBuilder()
+                .where()
+                .eq("group", targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser())
+                .and()
+                .eq("wiki_key", args[0])
+        );
+        deleteBuilder.delete();
         plugin.wikiEntries.create(entry);
         interwikiStorage.addWiki(wikiURL);
 
@@ -105,8 +133,9 @@ public class WikiResolver implements CommunicateReceiver {
         }
 
         String wikiName = args[0];
+        String group = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
         boolean containsName = plugin.wikiEntries
-            .queryForEq("group", targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser())
+            .queryForEq("group", group)
             .stream()
             .anyMatch(entry -> entry.wikiPrefix.equals(wikiName));
         if (!containsName) {
@@ -115,11 +144,37 @@ public class WikiResolver implements CommunicateReceiver {
         }
 
         StartWikiEntry startWiki = new StartWikiEntry();
-        startWiki.group = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
+        startWiki.group = group;
         startWiki.wikiKey = wikiName;
         plugin.startWikis.create(startWiki);
 
         manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：起始 Wiki 设置成功"));
+    }
+
+    @SneakyThrows
+    private void removeWiki(String[] args, String backendID, TargetData targetData, MessageManager manager) {
+        if (args.length < 1) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称"));
+            return;
+        }
+
+        String group = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
+        StartWikiEntry startWiki = plugin.startWikis.queryForId(group);
+        if (startWiki != null && startWiki.wikiKey.equals(args[0]))
+            plugin.startWikis.delete(startWiki);
+
+        DeleteBuilder<WikiEntry, Object> deleteBuilder = plugin.wikiEntries.deleteBuilder();
+        deleteBuilder.setWhere(
+            plugin.wikiEntries
+                .queryBuilder()
+                .where()
+                .eq("group", group)
+                .and()
+                .eq("wiki_key", args[0])
+        );
+        deleteBuilder.delete();
+
+        manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：移除 Wiki 成功"));
     }
 
     @SneakyThrows
@@ -168,7 +223,10 @@ public class WikiResolver implements CommunicateReceiver {
             String namespace = i + 1 >= interwikiSplitsList.size() ? null : interwikiSplitsList.get(i);
             String title = i + 1 >= interwikiSplitsList.size() ? interwikiSplitsList.get(i) : String.join(
                 ":",
-                interwikiSplitsList.subList(i + 1, interwikiSplitsList.size())
+                interwikiSplitsList.subList(
+                    i + 1,
+                    interwikiSplitsList.size()
+                )
             );
 
             WikiInfo wikiInfo = interwikiStorage.getWikiInfo(wikiEntry.baseURL, interwiki).get();
@@ -244,14 +302,16 @@ public class WikiResolver implements CommunicateReceiver {
                 message.append(data.get("pageURL"));
             }
             case NETWORK_ERROR -> {
+                Throwable error = (Throwable) data.get("error");
                 message.append("Wiki：查询页面过程中出现错误，报告信息如下\n");
-                message.append(((Throwable) data.get("error")).getMessage());
+                message.append(error.getMessage());
+                log.error("Error when querying wiki page", error);
             }
             case PAGE_NOT_FOUND -> {
                 message.append("没有找到 [[");
                 message.append(interwiki);
                 message.append(data.get("pageName"));
-                message.append("]] ，下列为搜索得到的类似页面：\n");
+                message.append("]] ，搜索得到的最相似页面为：\n");
                 String[] searchTitles = (String[]) data.get("pageSuggestions");
                 message.append(String.join("\n", searchTitles));
             }

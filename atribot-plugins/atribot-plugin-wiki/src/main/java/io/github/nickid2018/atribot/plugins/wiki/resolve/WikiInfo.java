@@ -4,16 +4,20 @@ import com.google.gson.*;
 import io.github.nickid2018.atribot.util.JsonUtil;
 import io.github.nickid2018.atribot.util.WebUtil;
 import it.unimi.dsi.fastutil.Pair;
+import it.unimi.dsi.fastutil.objects.Object2IntArrayMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Getter
@@ -57,6 +61,15 @@ public class WikiInfo {
         "prop", "sections"
     );
 
+    public static final Map<String, String> SEARCH = Map.of(
+        "action", "query",
+        "format", "json",
+        "list", "search",
+        "srenablerewrites", "true",
+        "srprop", "",
+        "srwhat", "text"
+    );
+
     public static final Predicate<String> ANONYMOUS_USER_PAGE = Pattern
         .compile("\\d{1,3}(\\.\\d{1,3}){3}")
         .asMatchPredicate();
@@ -70,7 +83,7 @@ public class WikiInfo {
     private final String scriptURL;
     private final String mainPageName;
 
-    private final Set<String> namespaces = new HashSet<>();
+    private final Object2IntMap<String> namespaces = new Object2IntArrayMap<>();
     private final Set<String> extensions = new HashSet<>();
 
     @SneakyThrows
@@ -106,11 +119,19 @@ public class WikiInfo {
 
         JsonObject namespacesObject = query.getAsJsonObject("namespaces");
         Map<String, JsonElement> namespacesMap = namespacesObject.asMap();
-        for (JsonElement element : namespacesMap.values())
-            namespaces.add(element.getAsJsonObject().get("*").getAsString());
+        for (JsonElement element : namespacesMap.values()) {
+            JsonObject namespaceObject = element.getAsJsonObject();
+            String name = namespaceObject.get("*").getAsString();
+            int id = namespaceObject.get("id").getAsInt();
+            namespaces.put(name, id);
+        }
         JsonArray namespaceAliasesArray = query.getAsJsonArray("namespacealiases");
-        for (JsonElement element : namespaceAliasesArray)
-            namespaces.add(element.getAsJsonObject().get("*").getAsString());
+        for (JsonElement element : namespaceAliasesArray) {
+            JsonObject namespaceAliasObject = element.getAsJsonObject();
+            String alias = namespaceAliasObject.get("*").getAsString();
+            int id = namespaceAliasObject.get("id").getAsInt();
+            namespaces.put(alias, id);
+        }
     }
 
     public String resolveArticleURL(String title, String section) {
@@ -128,7 +149,7 @@ public class WikiInfo {
             return PageInfo.directURL(resolveArticleURL(title, section));
         if (title == null || title.isEmpty())
             return parsePageInfo(null, mainPageName, null);
-        if (namespace != null && !namespaces.contains(namespace))
+        if (namespace != null && !namespaces.containsKey(namespace))
             return PageInfo.pageNotFound(namespace, new String[0]);
 
         String searchTitle = namespace == null || namespace.isEmpty() ? title : namespace + ":" + title;
@@ -150,11 +171,17 @@ public class WikiInfo {
             JsonObject queryData = pageData.getAsJsonObject("query");
             JsonObject pages = queryData.getAsJsonObject("pages");
             if (pages.isEmpty())
-                return PageInfo.pageNotFound(searchTitle, searchTitle(searchTitle));
+                return PageInfo.pageNotFound(
+                    searchTitle,
+                    searchTitle(Set.of(namespace == null ? "" : namespace), searchTitle, 1)
+                );
 
             JsonObject page = pages.entrySet().iterator().next().getValue().getAsJsonObject();
             if (page.has("missing"))
-                return PageInfo.pageNotFound(searchTitle, searchTitle(searchTitle));
+                return PageInfo.pageNotFound(
+                    searchTitle,
+                    searchTitle(Set.of(namespace == null ? "" : namespace), searchTitle, 1)
+                );
             if (page.has("special"))
                 return PageInfo.specialPage(searchTitle, resolveArticleURL(searchTitle, null));
 
@@ -309,7 +336,32 @@ public class WikiInfo {
         }
     }
 
-    public String[] searchTitle(String title) {
-        return new String[0];
+    public String[] searchTitle(Set<String> namespace, String title, int limit) throws IOException {
+        String searchNamespace;
+        if (namespace == null || namespace.isEmpty())
+            searchNamespace = "*";
+        else
+            searchNamespace = namespace
+                .stream()
+                .map(namespaces::getInt)
+                .map(String::valueOf)
+                .collect(Collectors.joining("|"));
+
+        Map<String, String> query = new HashMap<>(SEARCH);
+        query.put("srnamespace", searchNamespace);
+        query.put("srsearch", title);
+        query.put("srlimit", String.valueOf(limit));
+
+        HttpGet get = new HttpGet(apiURL + WebUtil.formatQuery(query));
+        JsonObject searchData = WebUtil.fetchDataInJson(get, ATRIBOT_WIKI_PLUGIN_UA, false).getAsJsonObject();
+        JsonArray search = JsonUtil.getDataInPath(searchData, "query.search", JsonArray.class).orElseThrow();
+
+        return search
+            .asList()
+            .stream()
+            .map(JsonElement::getAsJsonObject)
+            .map(obj -> obj.get("title"))
+            .map(JsonElement::getAsString)
+            .toArray(String[]::new);
     }
 }
