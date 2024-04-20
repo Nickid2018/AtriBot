@@ -124,6 +124,20 @@ public class FunctionUtil {
         };
     }
 
+    public static <T> Supplier<T> tryUntil(SupplierWithException<T, ?> supplier, int times, Function<Throwable , T> exceptionCase) {
+        return () -> {
+            for (int i = 0; i < times; i++) {
+                try {
+                    return supplier.get();
+                } catch (Throwable e) {
+                    if (i == times - 1)
+                        return exceptionCase.apply(e);
+                }
+            }
+            return null;
+        };
+    }
+
     public static <T> Supplier<T> noException(SupplierWithException<T, ?> supplier) {
         return noException(supplier, RuntimeException::new);
     }

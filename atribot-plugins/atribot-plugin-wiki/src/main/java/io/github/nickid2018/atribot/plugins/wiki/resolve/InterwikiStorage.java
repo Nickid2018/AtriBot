@@ -117,7 +117,10 @@ public class InterwikiStorage {
                     return href.substring(0, href.indexOf("?"));
                 } else
                     return url;
-            }, 5), plugin.getExecutorService()));
+            }, 5, t -> {
+                log.debug("Error getting interwiki URL '{}': {}", url, t.getMessage());
+                return url;
+            }), plugin.getExecutorService()));
         }
 
         return map;

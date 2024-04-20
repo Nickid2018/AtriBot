@@ -47,6 +47,12 @@ public class WikiResolver implements CommunicateReceiver {
                     commandData.targetData,
                     commandData.messageManager
                 ), commandData.backendID, commandData.targetData, commandData.messageManager));
+                case "wikistart" -> plugin.getExecutorService().execute(noException(() -> setStartWiki(
+                    commandData.commandArgs,
+                    commandData.backendID,
+                    commandData.targetData,
+                    commandData.messageManager
+                ), commandData.backendID, commandData.targetData, commandData.messageManager));
                 default -> {
                 }
             }
@@ -79,8 +85,41 @@ public class WikiResolver implements CommunicateReceiver {
         entry.wikiPrefix = wikiName;
         entry.baseURL = wikiURL;
 
+        plugin.wikiEntries
+            .queryForEq("group", entry.group)
+            .stream()
+            .filter(en -> en.wikiPrefix.equals(wikiName))
+            .findFirst()
+            .ifPresent(FunctionUtil.<WikiEntry>noException(plugin.wikiEntries::delete));
         plugin.wikiEntries.create(entry);
         interwikiStorage.addWiki(wikiURL);
+
+        manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：添加 Wiki 成功"));
+    }
+
+    @SneakyThrows
+    private void setStartWiki(String[] args, String backendID, TargetData targetData, MessageManager manager) {
+        if (args.length < 1) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称"));
+            return;
+        }
+
+        String wikiName = args[0];
+        boolean containsName = plugin.wikiEntries
+            .queryForEq("group", targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser())
+            .stream()
+            .anyMatch(entry -> entry.wikiPrefix.equals(wikiName));
+        if (!containsName) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未找到对应 Wiki"));
+            return;
+        }
+
+        StartWikiEntry startWiki = new StartWikiEntry();
+        startWiki.group = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
+        startWiki.wikiKey = wikiName;
+        plugin.startWikis.create(startWiki);
+
+        manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：起始 Wiki 设置成功"));
     }
 
     @SneakyThrows
@@ -123,6 +162,7 @@ public class WikiResolver implements CommunicateReceiver {
         }
 
         PageInfo lastFoundPageInfo = null;
+        String lastInterwiki = "";
         for (int i = 0; i < interwikiSplitsList.size(); i++) {
             String interwiki = String.join(":", interwikiSplitsList.subList(0, i));
             String namespace = i + 1 >= interwikiSplitsList.size() ? null : interwikiSplitsList.get(i);
@@ -135,17 +175,23 @@ public class WikiResolver implements CommunicateReceiver {
             if (wikiInfo == null)
                 break;
             lastFoundPageInfo = wikiInfo.parsePageInfo(namespace, title, section);
+            lastInterwiki = interwiki;
         }
+
+        if (!lastInterwiki.isEmpty())
+            lastInterwiki += ":";
+        if (nowWikiEntry.isPresent())
+            lastInterwiki = interwikiSplits[0] + ":" + lastInterwiki;
 
         if (lastFoundPageInfo == null) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未找到页面"));
             return;
         }
 
-        processPageInfo(lastFoundPageInfo, "", backendID, targetData, manager);
+        processPageInfo(lastFoundPageInfo, lastInterwiki, "", backendID, targetData, manager);
     }
 
-    private void processPageInfo(PageInfo info, String prependStr, String backendID, TargetData targetData, MessageManager manager) {
+    private void processPageInfo(PageInfo info, String interwiki, String prependStr, String backendID, TargetData targetData, MessageManager manager) {
         Map<String, Object> data = info.data();
         StringBuilder message = new StringBuilder(prependStr);
         switch (info.type()) {
@@ -158,22 +204,26 @@ public class WikiResolver implements CommunicateReceiver {
                 if ((boolean) data.get("multipleRedirects"))
                     message.append("[注意：此页面被多重重定向！]\n");
                 message.append("（[[");
+                message.append(interwiki);
                 message.append(data.get("pageNameSource"));
                 message.append("]] 重定向至 [[");
+                message.append(interwiki);
                 message.append(data.get("pageNameRedirected"));
                 message.append("]]）\n");
                 PageInfo pageInfo = (PageInfo) data.get("pageInfo");
-                processPageInfo(pageInfo, message.toString(), backendID, targetData, manager);
+                processPageInfo(pageInfo, interwiki, message.toString(), backendID, targetData, manager);
                 return;
             }
             case NORMALIZED -> {
                 message.append("（[[");
+                message.append(interwiki);
                 message.append(data.get("pageNameSource"));
                 message.append("]] 自动修正为 [[");
+                message.append(interwiki);
                 message.append(data.get("pageNameRedirected"));
                 message.append("]]）\n");
                 PageInfo pageInfo = (PageInfo) data.get("pageInfo");
-                processPageInfo(pageInfo, message.toString(), backendID, targetData, manager);
+                processPageInfo(pageInfo, interwiki, message.toString(), backendID, targetData, manager);
                 return;
             }
             case SPECIAL -> {
@@ -199,6 +249,7 @@ public class WikiResolver implements CommunicateReceiver {
             }
             case PAGE_NOT_FOUND -> {
                 message.append("没有找到 [[");
+                message.append(interwiki);
                 message.append(data.get("pageName"));
                 message.append("]] ，下列为搜索得到的类似页面：\n");
                 String[] searchTitles = (String[]) data.get("pageSuggestions");
@@ -206,6 +257,7 @@ public class WikiResolver implements CommunicateReceiver {
             }
             case SECTION_NOT_FOUND -> {
                 message.append("没有找到页面 [[");
+                message.append(interwiki);
                 message.append(data.get("pageName"));
                 message.append("]] 中的指定章节，下列为页面内存在的所有章节：\n");
                 String[] availableSections = (String[]) data.get("availableSections");

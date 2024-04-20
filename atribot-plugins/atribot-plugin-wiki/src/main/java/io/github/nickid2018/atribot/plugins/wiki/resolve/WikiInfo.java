@@ -47,11 +47,13 @@ public class WikiInfo {
 
     public static final Map<String, String> PAGE_PARSE = Map.of(
         "action", "parse",
-        "prop", "text"
+        "format", "json",
+        "prop", "wikitext"
     );
 
     public static final Map<String, String> PAGE_PARSE_SECTIONS = Map.of(
         "action", "parse",
+        "format", "json",
         "prop", "sections"
     );
 
@@ -112,11 +114,13 @@ public class WikiInfo {
     }
 
     public String resolveArticleURL(String title, String section) {
-        return articleURL.replace("$1", title + (section == null || section.isEmpty() ? "" : ("#" + section)));
+        return articleURL.replace("$1", title)
+            + (section == null || section.isEmpty() ? "" : ("#" + WebUtil.encode(section)));
     }
 
     public String resolveScriptURL(int pageID, String section) {
-        return scriptURL + "?curid=" + pageID + (section == null || section.isEmpty() ? "" : ("#" + section));
+        return scriptURL + "?curid=" + pageID
+            + (section == null || section.isEmpty() ? "" : ("#" + WebUtil.encode(section)));
     }
 
     public PageInfo parsePageInfo(String namespace, String title, String section) {
@@ -135,6 +139,11 @@ public class WikiInfo {
         try {
             Map<String, String> query = new HashMap<>(PAGE_QUERY);
             query.put("titles", searchTitle);
+
+            // ... fk
+            if (articleURL.contains("moegirl.org.cn"))
+                query.put("prop", "info|pageprops");
+
             HttpGet get = new HttpGet(apiURL + WebUtil.formatQuery(query));
             JsonObject pageData = WebUtil.fetchDataInJson(get, ATRIBOT_WIKI_PLUGIN_UA, false).getAsJsonObject();
 
@@ -150,7 +159,7 @@ public class WikiInfo {
                 return PageInfo.specialPage(searchTitle, resolveArticleURL(searchTitle, null));
 
             int pageID = page.get("pageid").getAsInt();
-            String source = searchTitle + (section == null || section.isEmpty() ? "" : ("#" + section));
+            String source = searchTitle + (section == null || section.isEmpty() ? "" : ("#" + WebUtil.encode(section)));
 
             if (queryData.has("redirects")) {
                 JsonObject redirect = queryData.getAsJsonArray("redirects").get(0).getAsJsonObject();
@@ -292,7 +301,7 @@ public class WikiInfo {
             JsonObject pageParse = WebUtil.fetchDataInJson(parseGet, ATRIBOT_WIKI_PLUGIN_UA, false).getAsJsonObject();
             String parse = JsonUtil.getStringInPath(pageParse, "parse.wikitext.*").orElseThrow();
             if (section != null && !section.isEmpty())
-                parse = parse.substring(parse.indexOf('\n'));
+                parse = parse.substring(parse.indexOf('\n')).trim();
             parse = parse.substring(0, parse.indexOf('\n'));
             return PageInfo.normalPage(searchTitle, section, resolveScriptURL(pageID, section), parse);
         } catch (Exception e) {
