@@ -28,6 +28,8 @@ public class MessageManager {
     private final MessageBackendListener listener;
     private final BackendServer server;
     private final DatabaseManager messageDatabase;
+    private final PermissionManager permissionManager;
+    private final FileTransfer fileTransfer;
     private final Map<String, Map<String, String>> backendInformation = new HashMap<>();
     private final Dao<MessageQueueEntry, String> messageQueueDao;
 
@@ -36,10 +38,12 @@ public class MessageManager {
         server = new BackendServer(() -> listener);
         PacketRegister.registerBackendPackets(server);
 
-        String queueMessage = Configuration.getStringOrElse("database.queue_message", "database/queue_message.db");
+        String queueMessage = Configuration.getStringOrElse("database.message", "database/message.db");
         messageDatabase = new DatabaseManager(queueMessage);
+        log.info("Message Database linked to {}", queueMessage);
         messageQueueDao = messageDatabase.getTable(MessageQueueEntry.class);
-        log.info("Message Queue Database linked to {}", queueMessage);
+        permissionManager = new PermissionManager(this);
+        fileTransfer = new FileTransfer(this);
     }
 
     public void start() {

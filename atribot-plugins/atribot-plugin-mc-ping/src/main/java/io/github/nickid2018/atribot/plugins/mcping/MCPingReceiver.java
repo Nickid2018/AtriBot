@@ -7,17 +7,18 @@ import com.google.gson.JsonObject;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
+import io.github.nickid2018.atribot.network.message.ImageMessage;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.util.JsonUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomStringUtils;
 
+import java.io.ByteArrayInputStream;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.net.URI;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -96,7 +97,24 @@ public class MCPingReceiver implements CommunicateReceiver {
 
                         sb.append(JsonUtil.getStringInPathOrElse(
                             json, "description.text", "").replaceAll("§.", ""));
-                        manager.sendMessage(backend, targetData, MessageChain.text(sb.toString().trim()));
+                        MessageChain chain = MessageChain.text(sb.toString().trim());
+
+                        Optional<String> favicon = JsonUtil.getString(json, "favicon");
+                        if (favicon.isPresent()) {
+                            String base64 = favicon.get().split(",", 2)[1];
+                            byte[] bytes = Base64.getDecoder().decode(base64);
+                            CompletableFuture<String> future = manager.getFileTransfer().sendFile(
+                                backend,
+                                new ByteArrayInputStream(bytes),
+                                plugin.getExecutorService()
+                            );
+                            future.thenAccept(url -> chain.next(new ImageMessage(
+                                RandomStringUtils.random(16, true, true),
+                                URI.create(url)
+                            )));
+                        }
+
+                        manager.sendMessage(backend, targetData, chain);
                     } catch (Exception e) {
                         manager.sendMessage(
                             backend,

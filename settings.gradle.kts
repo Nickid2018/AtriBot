@@ -14,6 +14,7 @@ includeProject("atribot-plugin-wakatime", "atribot-plugins/atribot-plugin-wakati
 includeProject("atribot-plugin-oauth2-service", "atribot-plugins/atribot-plugin-oauth2-service")
 includeProject("atribot-plugin-mc-ping", "atribot-plugins/atribot-plugin-mc-ping")
 includeProject("atribot-plugin-wiki", "atribot-plugins/atribot-plugin-wiki")
+includeProject("atribot-plugin-web-renderer", "atribot-plugins/atribot-web-renderer")
 
 // Backends Here
 includeProject("atribot-backend-console") // Test Console Backend

@@ -171,7 +171,7 @@ public class WakatimeReceiver implements CommunicateReceiver {
                         builder.append(name).append(": ").append(percent).append("%\n");
                     });
 
-                manager.sendMessage(backendID, targetData, MessageChain.text(builder.toString()));
+                manager.sendMessage(backendID, targetData, MessageChain.text(builder.toString().trim()));
             }, (t, e) -> whenFetchError(e, backendID, manager, targetData)), plugin.getExecutorService())
             .exceptionallyAsync(
                 t -> whenAuthError(t, backendID, manager, targetData),

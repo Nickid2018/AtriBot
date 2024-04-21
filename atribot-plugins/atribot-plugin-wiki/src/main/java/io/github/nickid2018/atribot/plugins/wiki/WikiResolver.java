@@ -4,6 +4,7 @@ import com.j256.ormlite.stmt.DeleteBuilder;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
+import io.github.nickid2018.atribot.core.message.PermissionLevel;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.plugins.wiki.persist.StartWikiEntry;
@@ -97,27 +98,26 @@ public class WikiResolver implements CommunicateReceiver {
 
     @SneakyThrows
     private void addWiki(String[] args, String backendID, TargetData targetData, MessageManager manager) {
+        if (!manager.getPermissionManager().checkTargetData(targetData, PermissionLevel.ADMIN)) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：权限不足"));
+            return;
+        }
+
         if (args.length < 2) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称或 URL"));
             return;
         }
 
+        String group = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
         String wikiName = args[0];
         String wikiURL = args[1];
         WikiEntry entry = new WikiEntry();
-        entry.group = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
+        entry.group = group;
         entry.wikiPrefix = wikiName;
         entry.baseURL = wikiURL;
 
         DeleteBuilder<WikiEntry, Object> deleteBuilder = plugin.wikiEntries.deleteBuilder();
-        deleteBuilder.setWhere(
-            plugin.wikiEntries
-                .queryBuilder()
-                .where()
-                .eq("group", targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser())
-                .and()
-                .eq("wiki_key", args[0])
-        );
+        deleteBuilder.where().eq("group", group).and().eq("wiki_key", args[0]);
         deleteBuilder.delete();
         plugin.wikiEntries.create(entry);
         interwikiStorage.addWiki(wikiURL);
@@ -127,6 +127,11 @@ public class WikiResolver implements CommunicateReceiver {
 
     @SneakyThrows
     private void setStartWiki(String[] args, String backendID, TargetData targetData, MessageManager manager) {
+        if (!manager.getPermissionManager().checkTargetData(targetData, PermissionLevel.ADMIN)) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：权限不足"));
+            return;
+        }
+
         if (args.length < 1) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称"));
             return;
@@ -153,6 +158,11 @@ public class WikiResolver implements CommunicateReceiver {
 
     @SneakyThrows
     private void removeWiki(String[] args, String backendID, TargetData targetData, MessageManager manager) {
+        if (!manager.getPermissionManager().checkTargetData(targetData, PermissionLevel.ADMIN)) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：权限不足"));
+            return;
+        }
+
         if (args.length < 1) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称"));
             return;
@@ -164,14 +174,7 @@ public class WikiResolver implements CommunicateReceiver {
             plugin.startWikis.delete(startWiki);
 
         DeleteBuilder<WikiEntry, Object> deleteBuilder = plugin.wikiEntries.deleteBuilder();
-        deleteBuilder.setWhere(
-            plugin.wikiEntries
-                .queryBuilder()
-                .where()
-                .eq("group", group)
-                .and()
-                .eq("wiki_key", args[0])
-        );
+        deleteBuilder.where().eq("group", group).and().eq("wiki_key", args[0]);
         deleteBuilder.delete();
 
         manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：移除 Wiki 成功"));
