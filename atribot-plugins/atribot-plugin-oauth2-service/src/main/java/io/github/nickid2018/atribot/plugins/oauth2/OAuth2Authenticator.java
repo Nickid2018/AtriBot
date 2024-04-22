@@ -216,7 +216,7 @@ public class OAuth2Authenticator implements HttpHandler {
         manager.sendMessage(
             backendID,
             target,
-            MessageChain.text("Please use following link to authenticate:\n" + url)
+            MessageChain.text("使用此链接以完成授权：\n" + url)
         );
         return future;
     }

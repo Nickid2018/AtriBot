@@ -60,18 +60,22 @@ public class TransferFileResolver {
         switch (transferType) {
             case "file" -> {
                 String[] transferArgs = transferArg.split("=>");
+                boolean isFirstDot = transferArgs[0].equals(".");
+                boolean isSecondDot = transferArgs[1].equals(".");
                 if (transferArgs.length != 2)
                     return CompletableFuture.failedFuture(new IllegalArgumentException("Invalid transfer argument!"));
-                if (!transferArgs[0].equals(".")) {
+                if (isFirstDot) {
+                    transferArgs[0] = System.getProperty("java.io.tmpdir");
+                } else {
                     File transferFile = new File(transferArgs[0]);
                     if (!transferFile.isDirectory())
                         transferFile.mkdirs();
-                } else {
-                    transferArgs[0] = System.getProperty("java.io.tmpdir");
                 }
                 String randomName = RandomStringUtils.random(64, true, true);
                 File targetFile = new File(transferArgs[0], randomName);
-                File remoteFile = new File(transferArgs[1], randomName);
+
+                String remoteDir = isFirstDot && isSecondDot ? transferArgs[0] : transferArgs[1];
+                File remoteFile = new File(remoteDir, randomName);
                 return CompletableFuture.supplyAsync(FunctionUtil.noException(() -> {
                     OutputStream os = new FileOutputStream(targetFile);
                     IOUtils.copy(data, os);

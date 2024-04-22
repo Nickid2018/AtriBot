@@ -6,6 +6,7 @@ dependencies {
     api(project(":atribot-plugin-wakatime"))
     api(project(":atribot-plugin-oauth2-service"))
     api(project(":atribot-plugin-wiki"))
+    api(project(":atribot-plugin-web-renderer"))
 }
 
 tasks.register<JavaExec>("run") {

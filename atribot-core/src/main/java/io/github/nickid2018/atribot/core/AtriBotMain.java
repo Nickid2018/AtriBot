@@ -53,6 +53,10 @@ public class AtriBotMain {
                 if (line.startsWith("unload ")) {
                     PluginManager.unloadPlugin(line.substring(7));
                 }
+                if (line.startsWith("reload ")) {
+                    PluginManager.unloadPlugin(line.substring(7));
+                    PluginManager.loadPlugin(line.substring(7));
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
