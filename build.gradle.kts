@@ -22,7 +22,7 @@ dependencies {
     api("org.apache.commons:commons-lang3:3.14.0")
     api("commons-io:commons-io:2.15.1")
     api("org.apache.httpcomponents.client5:httpclient5:5.3.1")
-    api("com.google.guava:guava:33.0.0-jre")
+    api("com.google.guava:guava:33.1.0-jre")
     api("com.google.code.gson:gson:2.10.1")
     api("it.unimi.dsi:fastutil:8.5.13")
     api("org.snakeyaml:snakeyaml-engine:2.7")

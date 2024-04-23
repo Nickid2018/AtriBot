@@ -7,10 +7,11 @@ import java.util.Map;
 
 public record PageInfo(PageType type, Map<String, Object> data) {
 
-    public static PageInfo normalPage(String pageName, String pageSection, String pageURL, String content) {
+    public static PageInfo normalPage(String pageName, String pageSection, String sectionIndex, String pageURL, String content) {
         return new PageInfo(PageType.NORMAL, Map.of(
             "pageName", pageName,
             "pageSection", pageSection == null ? "" : pageSection,
+            "pageSectionIndex", sectionIndex == null ? "" : sectionIndex,
             "pageURL", pageURL,
             "content", content
         ));

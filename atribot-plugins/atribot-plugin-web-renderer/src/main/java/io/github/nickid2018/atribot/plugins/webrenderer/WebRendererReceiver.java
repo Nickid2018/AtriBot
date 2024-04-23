@@ -46,7 +46,8 @@ public class WebRendererReceiver implements CommunicateReceiver {
         String elementSelector = (String) data.getOrDefault("element", "html");
         IntIntPair windowSize = data.containsKey("windowSize") ? (IntIntPair) data.get("windowSize") : null;
         return (CompletableFuture<T>) CompletableFuture.supplyAsync(() -> {
-            RemoteWebDriver driver = plugin.getDriver();
+            RemoteWebDriver driver = plugin.createNewDriver();
+
             if (windowSize != null)
                 driver.manage().window().setSize(new Dimension(windowSize.leftInt(), windowSize.rightInt()));
             else
@@ -64,7 +65,7 @@ public class WebRendererReceiver implements CommunicateReceiver {
             WebElement webElement = driver.findElement(element);
             byte[] screenshot = webElement.getScreenshotAs(OutputType.BYTES);
 
-            driver.get("about:blank");
+            driver.quit();
 
             return screenshot;
         }, plugin.getRendererExecutor());
@@ -80,11 +81,11 @@ public class WebRendererReceiver implements CommunicateReceiver {
                 new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8)),
                 plugin.getExecutorService()
             )
-            .thenApplyAsync(uri -> {
+            .thenApply(uri -> {
                 data.put("page", uri);
                 return data;
-            }, plugin.getExecutorService())
-            .thenComposeAsync(this::renderElement, plugin.getExecutorService());
+            })
+            .thenCompose(this::renderElement);
     }
 
     @Override

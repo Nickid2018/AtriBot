@@ -186,7 +186,7 @@ public class WikiInfo {
                 return PageInfo.specialPage(searchTitle, resolveArticleURL(searchTitle, null));
 
             int pageID = page.get("pageid").getAsInt();
-            String source = searchTitle + (section == null || section.isEmpty() ? "" : ("#" + WebUtil.encode(section)));
+            String source = searchTitle + (section == null || section.isEmpty() ? "" : ("#" + section));
 
             if (queryData.has("redirects")) {
                 JsonObject redirect = queryData.getAsJsonArray("redirects").get(0).getAsJsonObject();
@@ -291,7 +291,7 @@ public class WikiInfo {
                     .orElseThrow();
                 JsonObject pageExtract = pagesExtracts.entrySet().iterator().next().getValue().getAsJsonObject();
                 String extract = pageExtract.get("extract").getAsString();
-                return PageInfo.normalPage(searchTitle, section, resolveScriptURL(pageID, null), extract);
+                return PageInfo.normalPage(searchTitle, null, null, resolveScriptURL(pageID, null), extract);
             }
 
             Map<String, String> parseQuery = new HashMap<>(PAGE_PARSE);
@@ -330,7 +330,13 @@ public class WikiInfo {
             if (section != null && !section.isEmpty())
                 parse = parse.substring(parse.indexOf('\n')).trim();
             parse = parse.substring(0, parse.indexOf('\n'));
-            return PageInfo.normalPage(searchTitle, section, resolveScriptURL(pageID, section), parse);
+            return PageInfo.normalPage(
+                searchTitle,
+                section,
+                parseQuery.get("section"),
+                resolveScriptURL(pageID, section),
+                parse
+            );
         } catch (Exception e) {
             return PageInfo.networkError(searchTitle, e);
         }

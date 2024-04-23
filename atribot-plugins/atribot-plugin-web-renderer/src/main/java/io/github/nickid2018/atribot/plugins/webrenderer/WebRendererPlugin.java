@@ -6,6 +6,7 @@ import io.github.nickid2018.atribot.core.plugin.AbstractAtriBotPlugin;
 import io.github.nickid2018.atribot.core.plugin.PluginInfo;
 import io.github.nickid2018.atribot.util.Configuration;
 import lombok.Getter;
+import lombok.SneakyThrows;
 import org.openqa.selenium.Proxy;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -17,8 +18,6 @@ import java.util.concurrent.Executors;
 public class WebRendererPlugin extends AbstractAtriBotPlugin {
 
     private final WebRendererReceiver receiver = new WebRendererReceiver(this);
-    @Getter
-    private RemoteWebDriver driver;
     @Getter
     private ExecutorService rendererExecutor;
 
@@ -40,6 +39,18 @@ public class WebRendererPlugin extends AbstractAtriBotPlugin {
 
     @Override
     public void onPluginPreload() throws Exception {
+        rendererExecutor = Executors.newSingleThreadExecutor(
+            new ThreadFactoryBuilder()
+                .setNameFormat("WebRenderer-%d")
+                .setDaemon(true)
+                .build()
+        );
+
+        super.onPluginPreload();
+    }
+
+    @SneakyThrows
+    public RemoteWebDriver createNewDriver() {
         FirefoxOptions options = new FirefoxOptions();
         options.addArguments("--headless");
         options.addArguments("--no-sandbox");
@@ -60,26 +71,15 @@ public class WebRendererPlugin extends AbstractAtriBotPlugin {
             options.setProxy(proxy);
         }
 
-        driver = new RemoteWebDriver(
+        return new RemoteWebDriver(
             URI.create(Configuration.getStringOrElse("webrenderer.url", "http://localhost:4444")).toURL(),
             options
         );
-        driver.get("about:blank");
-
-        rendererExecutor = Executors.newSingleThreadExecutor(
-            new ThreadFactoryBuilder()
-                .setNameFormat("WebRenderer-%d")
-                .setDaemon(true)
-                .build()
-        );
-
-        super.onPluginPreload();
     }
 
     @Override
     public void onPluginUnload() throws Exception {
         super.onPluginUnload();
         rendererExecutor.shutdown();
-        driver.quit();
     }
 }

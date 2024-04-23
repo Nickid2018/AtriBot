@@ -10,7 +10,10 @@ import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.plugins.wiki.persist.StartWikiEntry;
 import io.github.nickid2018.atribot.plugins.wiki.persist.WikiEntry;
-import io.github.nickid2018.atribot.plugins.wiki.resolve.*;
+import io.github.nickid2018.atribot.plugins.wiki.resolve.InterwikiStorage;
+import io.github.nickid2018.atribot.plugins.wiki.resolve.PageInfo;
+import io.github.nickid2018.atribot.plugins.wiki.resolve.PageShooter;
+import io.github.nickid2018.atribot.plugins.wiki.resolve.WikiInfo;
 import io.github.nickid2018.atribot.util.FunctionUtil;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
@@ -20,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 @Slf4j
 @AllArgsConstructor
@@ -222,6 +226,7 @@ public class WikiResolver implements CommunicateReceiver {
 
         PageInfo lastFoundPageInfo = null;
         String lastInterwiki = "";
+        WikiInfo lastWikiInfo = null;
         for (int i = 0; i < interwikiSplitsList.size(); i++) {
             String interwiki = String.join(":", interwikiSplitsList.subList(0, i));
             String namespace = i + 1 >= interwikiSplitsList.size() ? null : interwikiSplitsList.get(i);
@@ -236,6 +241,7 @@ public class WikiResolver implements CommunicateReceiver {
             WikiInfo wikiInfo = interwikiStorage.getWikiInfo(wikiEntry.baseURL, interwiki).get();
             if (wikiInfo == null)
                 break;
+            lastWikiInfo = wikiInfo;
             lastFoundPageInfo = wikiInfo.parsePageInfo(namespace, title, section);
             lastInterwiki = interwiki;
         }
@@ -250,10 +256,10 @@ public class WikiResolver implements CommunicateReceiver {
             return;
         }
 
-        processPageInfo(lastFoundPageInfo, lastInterwiki, "", backendID, targetData, manager, wikiEntry);
+        processPageInfo(lastFoundPageInfo, lastWikiInfo, lastInterwiki, "", backendID, targetData, manager, wikiEntry);
     }
 
-    private void processPageInfo(PageInfo info, String interwiki, String prependStr,
+    private void processPageInfo(PageInfo info, WikiInfo wikiInfo, String interwiki, String prependStr,
         String backendID, TargetData targetData, MessageManager manager, WikiEntry wikiEntry) {
         Map<String, Object> data = info.data();
         StringBuilder message = new StringBuilder(prependStr);
@@ -274,7 +280,16 @@ public class WikiResolver implements CommunicateReceiver {
                 message.append(data.get("pageNameRedirected"));
                 message.append("]]）\n");
                 PageInfo pageInfo = (PageInfo) data.get("pageInfo");
-                processPageInfo(pageInfo, interwiki, message.toString(), backendID, targetData, manager, wikiEntry);
+                processPageInfo(
+                    pageInfo,
+                    wikiInfo,
+                    interwiki,
+                    message.toString(),
+                    backendID,
+                    targetData,
+                    manager,
+                    wikiEntry
+                );
                 return;
             }
             case NORMALIZED -> {
@@ -286,7 +301,16 @@ public class WikiResolver implements CommunicateReceiver {
                 message.append(data.get("pageNameRedirected"));
                 message.append("]]）\n");
                 PageInfo pageInfo = (PageInfo) data.get("pageInfo");
-                processPageInfo(pageInfo, interwiki, message.toString(), backendID, targetData, manager, wikiEntry);
+                processPageInfo(
+                    pageInfo,
+                    wikiInfo,
+                    interwiki,
+                    message.toString(),
+                    backendID,
+                    targetData,
+                    manager,
+                    wikiEntry
+                );
                 return;
             }
             case SPECIAL -> {
@@ -334,30 +358,73 @@ public class WikiResolver implements CommunicateReceiver {
 
         manager.sendMessage(backendID, targetData, MessageChain.text(message.toString()));
 
-        if (info.type() == PageType.NORMAL && wikiEntry.trustRender)
-            CompletableFuture
-                .supplyAsync(() -> new PageShooter((String) data.get("pageURL")), plugin.getExecutorService())
-                .thenComposeAsync(shooter -> shooter.renderInfobox(plugin, wikiEntry), plugin.getExecutorService())
-                .thenComposeAsync(image -> {
-                    if (image == null)
-                        return CompletableFuture.completedFuture(null);
-                    return manager.getFileTransfer().sendFile(
-                        backendID,
-                        new ByteArrayInputStream(image),
-                        plugin.getExecutorService()
-                    );
-                }, plugin.getExecutorService())
-                .thenAcceptAsync(fileID -> {
-                    if (fileID == null)
-                        return;
+        if (!wikiEntry.trustRender)
+            return;
+
+        doRender(
+            switch (info.type()) {
+                case NORMAL -> (Function<PageShooter, CompletableFuture<byte[]>>) (shooter -> {
+                    String pageSection = (String) data.get("pageSection");
+                    if (pageSection == null || pageSection.isEmpty())
+                        return shooter.renderInfobox(plugin, wikiEntry);
+                    else
+                        return shooter.renderSection(
+                            plugin,
+                            (String) data.get("pageName"),
+                            (String) data.get("pageSectionIndex"),
+                            wikiInfo,
+                            wikiEntry
+                        );
+                });
+                case DISAMBIGUATION ->
+                    (Function<PageShooter, CompletableFuture<byte[]>>) (shooter -> shooter.renderFullPage(
+                        plugin,
+                        wikiEntry
+                    ));
+                default -> null;
+            },
+            (String) data.get("pageURL"),
+            backendID,
+            targetData,
+            manager
+        );
+    }
+
+    private void doRender(Function<PageShooter, CompletableFuture<byte[]>> screenshotFunc, String pageURL,
+        String backendID, TargetData targetData, MessageManager manager) {
+        if (screenshotFunc == null)
+            return;
+        CompletableFuture
+            .supplyAsync(() -> new PageShooter(pageURL), plugin.getExecutorService())
+            .thenCompose(screenshotFunc)
+            .thenComposeAsync(image -> {
+                if (image == null)
+                    return CompletableFuture.completedFuture(null);
+                return manager.getFileTransfer().sendFile(
+                    backendID,
+                    new ByteArrayInputStream(image),
+                    plugin.getExecutorService()
+                );
+            }, plugin.getExecutorService())
+            .thenAccept(fileID -> {
+                if (fileID == null)
+                    return;
+                manager.sendMessage(
+                    backendID,
+                    targetData,
+                    new MessageChain().next(new ImageMessage("", URI.create(fileID)))
+                );
+            })
+            .exceptionallyAsync(e -> {
+                String errorMessage = e.getMessage();
+                if (errorMessage.contains("NS_ERROR_FAILURE")) {
                     manager.sendMessage(
                         backendID,
                         targetData,
-                        new MessageChain().next(new ImageMessage("", URI.create(fileID)))
+                        MessageChain.text("Wiki：页面可能过长，无法渲染")
                     );
-                }, plugin.getExecutorService())
-                .exceptionallyAsync(e -> {
-                    String errorMessage = e.getMessage();
+                    log.debug("Error when rendering wiki page, may page is too long?", e);
+                } else {
                     errorMessage = errorMessage.length() > 200 ? errorMessage.substring(0, 200) + "..." : errorMessage;
                     manager.sendMessage(
                         backendID,
@@ -365,8 +432,9 @@ public class WikiResolver implements CommunicateReceiver {
                         MessageChain.text("Wiki：渲染页面时出现错误，错误报告如下\n" + errorMessage)
                     );
                     log.error("Error when rendering wiki page", e);
-                    return null;
-                }, plugin.getExecutorService());
+                }
+                return null;
+            }, plugin.getExecutorService());
     }
 
     @Override

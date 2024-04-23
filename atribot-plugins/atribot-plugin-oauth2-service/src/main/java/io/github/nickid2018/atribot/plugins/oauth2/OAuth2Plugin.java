@@ -48,6 +48,7 @@ public class OAuth2Plugin extends AbstractAtriBotPlugin {
     public void onPluginUnload() throws Exception {
         server.stopServer();
         databaseManager.close();
+        receiver.onPluginUnload();
         Communication.communicate("oauth2.service.stopped", null);
         super.onPluginUnload();
     }

@@ -10,7 +10,6 @@ import lombok.SneakyThrows;
 
 import java.util.Scanner;
 
-
 public class AtriBotMain {
     @SneakyThrows
     public static void main(String[] args) {

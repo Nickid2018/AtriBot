@@ -70,10 +70,7 @@ public class InterwikiStorage {
 
         return availableInterwikis
             .get(startWikiURL)
-            .thenApplyAsync(
-                interwikis -> interwikis.get(interwikiName),
-                plugin.getExecutorService()
-            )
+            .thenApply(interwikis -> interwikis.get(interwikiName))
             .thenComposeAsync(
                 interwikiURL -> interwikiURL == null
                                 ? CompletableFuture.completedFuture(null)

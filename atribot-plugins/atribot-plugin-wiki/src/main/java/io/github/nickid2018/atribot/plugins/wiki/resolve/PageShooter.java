@@ -2,9 +2,12 @@ package io.github.nickid2018.atribot.plugins.wiki.resolve;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.gson.JsonObject;
 import io.github.nickid2018.atribot.core.communicate.Communication;
 import io.github.nickid2018.atribot.plugins.wiki.WikiPlugin;
 import io.github.nickid2018.atribot.plugins.wiki.persist.WikiEntry;
+import io.github.nickid2018.atribot.util.FunctionUtil;
+import io.github.nickid2018.atribot.util.JsonUtil;
 import io.github.nickid2018.atribot.util.WebUtil;
 import it.unimi.dsi.fastutil.ints.IntIntPair;
 import it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
@@ -107,6 +110,45 @@ public class PageShooter {
         doc.getElementsByClass("custom-modal").forEach(Element::remove);
     }
 
+    private static final Map<String, String> PAGE_PARSE_HTML = Map.of(
+        "action", "parse",
+        "format", "json",
+        "prop", "text"
+    );
+
+    public CompletableFuture<byte[]> renderFullPage(WikiPlugin plugin, WikiEntry wikiEntry) {
+        return CompletableFuture
+            .supplyAsync(() -> {
+                Document doc = Jsoup.parse(sourceHTML);
+                cleanDocument(doc, Objects.requireNonNull(doc.getElementById("mw-content-text")));
+                String html = doc.html();
+                return ObjectObjectImmutablePair.of(html, null);
+            }, plugin.getExecutorService())
+            .thenCompose(data -> renderHTML(data.left(), "#mw-content-text", wikiEntry));
+    }
+
+    public CompletableFuture<byte[]> renderSection(WikiPlugin plugin, String page, String sectionID, WikiInfo info, WikiEntry wikiEntry) {
+        return CompletableFuture
+            .supplyAsync(FunctionUtil.noException(() -> {
+                Document doc = Jsoup.parse(sourceHTML);
+
+                Map<String, String> parseArgs = new HashMap<>(PAGE_PARSE_HTML);
+                parseArgs.put("page", page);
+                parseArgs.put("section", sectionID);
+                JsonObject parseSectionHTML = WebUtil.fetchDataInJson(
+                    new HttpGet(info.getApiURL() + WebUtil.formatQuery(parseArgs)),
+                    WikiInfo.ATRIBOT_WIKI_PLUGIN_UA
+                ).getAsJsonObject();
+                Objects.requireNonNull(doc.getElementById("mw-content-text"))
+                       .html(JsonUtil.getStringInPathOrElse(parseSectionHTML, "parse.text.*", ""));
+                cleanDocument(doc, Objects.requireNonNull(doc.getElementById("mw-content-text")));
+
+                String html = doc.html();
+                return ObjectObjectImmutablePair.of(html, null);
+            }), plugin.getExecutorService())
+            .thenCompose(data -> renderHTML(data.left(), "#mw-content-text", wikiEntry));
+    }
+
     private static final List<String> SUPPORT_INFOBOX = List.of(
         "notaninfobox", "infoboxtable", "infoboxSpecial", "infotemplatebox", "infobox2",
         "tpl-infobox", "portable-infobox", "toccolours", "infobox"
@@ -136,11 +178,10 @@ public class PageShooter {
                 String html = doc.html();
                 return ObjectObjectImmutablePair.of(html, "." + className);
             }, plugin.getExecutorService())
-            .thenComposeAsync(
+            .thenCompose(
                 data -> data == null
                         ? CompletableFuture.completedFuture(null)
-                        : renderHTML(data.left(), data.right(), wikiEntry),
-                plugin.getExecutorService()
+                        : renderHTML(data.left(), data.right(), wikiEntry)
             );
     }
 }
