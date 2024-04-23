@@ -51,7 +51,7 @@ public record PageInfo(PageType type, Map<String, Object> data) {
     }
 
     public static PageInfo filePage(String pageName, String pageURL, List<Pair<String, String>> fileAndMIME) {
-        return new PageInfo(PageType.UNSUPPORTED, Map.of(
+        return new PageInfo(PageType.FILES, Map.of(
             "pageName", pageName,
             "pageURL", pageURL,
             "fileAndMIME", fileAndMIME

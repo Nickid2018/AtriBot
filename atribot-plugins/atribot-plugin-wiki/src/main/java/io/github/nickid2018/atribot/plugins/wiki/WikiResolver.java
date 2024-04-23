@@ -12,6 +12,7 @@ import io.github.nickid2018.atribot.plugins.wiki.persist.StartWikiEntry;
 import io.github.nickid2018.atribot.plugins.wiki.persist.WikiEntry;
 import io.github.nickid2018.atribot.plugins.wiki.resolve.*;
 import io.github.nickid2018.atribot.util.FunctionUtil;
+import it.unimi.dsi.fastutil.Pair;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -267,6 +268,7 @@ public class WikiResolver implements CommunicateReceiver {
         );
     }
 
+    @SuppressWarnings("unchecked")
     private void processPageInfo(PageInfo info, WikiInfo wikiInfo, String interwiki,
         String prependStr, String backendID, TargetData targetData, MessageManager manager, WikiEntry wikiEntry) {
         Map<String, Object> data = info.data();
@@ -341,6 +343,21 @@ public class WikiResolver implements CommunicateReceiver {
                 message.append("消歧义页面\n");
                 message.append(data.get("pageURL"));
             }
+            case FILES -> {
+                List<Pair<String, String>> fileAndMIME = (List<Pair<String, String>>) data.get("fileAndMIME");
+                message.append("文件页面\n");
+                message.append(data.get("pageURL"));
+                message.append("\n共含有 ");
+                message.append(fileAndMIME.size());
+                message.append(" 个文件：");
+                for (Pair<String, String> pair : fileAndMIME) {
+                    message.append("\n");
+                    message.append(pair.left());
+                    message.append(" （MIME 类型：");
+                    message.append(pair.right());
+                    message.append("）");
+                }
+            }
             case ANONYMOUS_USER_PAGE -> message.append("匿名用户页面");
             case UNSUPPORTED -> {
                 message.append("暂不支持的页面类型\n");
@@ -403,6 +420,10 @@ public class WikiResolver implements CommunicateReceiver {
                                           wikiEntry
                                       )) :
                                       null;
+                case SPECIAL -> (Function<PageShooter, CompletableFuture<byte[]>>) (shooter -> shooter.renderSpecials(
+                    plugin,
+                    wikiEntry
+                ));
                 default -> null;
             },
             (String) data.get("pageURL"),
@@ -410,6 +431,21 @@ public class WikiResolver implements CommunicateReceiver {
             targetData,
             manager
         );
+
+        if (info.type() == PageType.FILES) {
+            List<Pair<String, String>> fileAndMIME = (List<Pair<String, String>>) data.get("fileAndMIME");
+            for (Pair<String, String> pair : fileAndMIME) {
+                String fileURL = pair.left();
+                String MIME = pair.right();
+                if (MIME.startsWith("image/")) {
+                    manager.sendMessage(
+                        backendID,
+                        targetData,
+                        new MessageChain().next(new ImageMessage("", URI.create(fileURL)))
+                    );
+                }
+            }
+        }
     }
 
     private void doRender(Function<PageShooter, CompletableFuture<byte[]>> screenshotFunc, String pageURL,

@@ -68,6 +68,19 @@ public class PageShooter {
         );
     }
 
+    private CompletableFuture<byte[]> renderPage(String element, WikiEntry wikiEntry) {
+        Map<String, Object> map = new HashMap<>(Map.of("page", url));
+        if (element != null)
+            map.put("element", element);
+        if (wikiEntry.renderWidth != 0 && wikiEntry.renderHeight != 0)
+            map.put("windowSize", IntIntPair.of(wikiEntry.renderWidth, wikiEntry.renderHeight));
+        return Communication.communicateWithResult(
+            "atribot-plugin-web-renderer",
+            "webrenderer.render_page_element",
+            map
+        );
+    }
+
     private void cleanDocument(Document doc, Element element) {
         while (!element.equals(doc.body())) {
             Element parent = element.parent();
@@ -166,6 +179,38 @@ public class PageShooter {
 
     public CompletableFuture<byte[]> renderDoc(WikiPlugin plugin, WikiEntry wikiEntry) {
         return renderWithSpecialClass(plugin, wikiEntry, SUPPORT_DOCUMENTATION, "documentation");
+    }
+
+    private static final List<String> SPECIAL_RENDERS = List.of(
+        "diff"
+    );
+
+    public CompletableFuture<byte[]> renderSpecials(WikiPlugin plugin, WikiEntry wikiEntry) {
+        return CompletableFuture
+            .supplyAsync(() -> {
+                Document doc = Jsoup.parse(sourceHTML);
+                Element found = null;
+                String className = null;
+
+                for (String classNameNow : SPECIAL_RENDERS) {
+                    found = doc.getElementsByClass(classNameNow).first();
+                    className = classNameNow;
+                    if (found != null)
+                        break;
+                }
+
+                if (found == null) {
+                    log.debug("No specials found in {}", url);
+                    return null;
+                }
+
+                return "." + className;
+            }, plugin.getExecutorService())
+            .thenCompose(
+                data -> data == null
+                        ? CompletableFuture.completedFuture(null)
+                        : renderPage(data, wikiEntry)
+            );
     }
 
     public CompletableFuture<byte[]> renderWithSpecialClass(WikiPlugin plugin, WikiEntry wikiEntry,

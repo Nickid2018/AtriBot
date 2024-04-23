@@ -39,7 +39,8 @@ public class WebRendererPlugin extends AbstractAtriBotPlugin {
 
     @Override
     public void onPluginPreload() throws Exception {
-        rendererExecutor = Executors.newSingleThreadExecutor(
+        rendererExecutor = Executors.newFixedThreadPool(
+            Configuration.getIntOrElse("webrenderer.thread_count", 4),
             new ThreadFactoryBuilder()
                 .setNameFormat("WebRenderer-%d")
                 .setDaemon(true)

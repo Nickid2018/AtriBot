@@ -81,7 +81,7 @@ public class WikiInfo {
     public static final Predicate<String> ANONYMOUS_USER_PAGE = Pattern
         .compile("\\d{1,3}(\\.\\d{1,3}){3}")
         .asMatchPredicate();
-    public static final Pattern DOCUMENTATION_TEMPLATE = Pattern.compile("\\{\\{[Dd]ocumentation(\\|\\s\\S+?)?}}");
+    public static final Pattern DOCUMENTATION_TEMPLATE = Pattern.compile("\\{\\{[Dd]ocumentation(\\|[\\s\\S]+?)?}}");
 
     public static final String ATRIBOT_WIKI_PLUGIN_UA = "Atribot Wiki Plugin/1.0";
 
@@ -172,7 +172,7 @@ public class WikiInfo {
 
             // ... fk
             if (articleURL.contains("moegirl.org.cn"))
-                query.put("prop", "info|pageprops");
+                query.put("prop", "info|pageprops|templates");
 
             HttpGet get = new HttpGet(apiURL + WebUtil.formatQuery(query));
             JsonObject pageData = WebUtil.fetchDataInJson(get, ATRIBOT_WIKI_PLUGIN_UA, false).getAsJsonObject();

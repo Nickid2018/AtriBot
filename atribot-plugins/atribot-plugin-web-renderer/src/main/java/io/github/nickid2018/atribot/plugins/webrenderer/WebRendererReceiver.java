@@ -43,6 +43,7 @@ public class WebRendererReceiver implements CommunicateReceiver {
     @SuppressWarnings("unchecked")
     public <T> CompletableFuture<T> renderElement(Map<String, Object> data) {
         String page = (String) data.get("page");
+        int timeout = (int) data.getOrDefault("timeout", 30);
         String elementSelector = (String) data.getOrDefault("element", "html");
         IntIntPair windowSize = data.containsKey("windowSize") ? (IntIntPair) data.get("windowSize") : null;
         return (CompletableFuture<T>) CompletableFuture.supplyAsync(() -> {
@@ -56,19 +57,23 @@ public class WebRendererReceiver implements CommunicateReceiver {
                 driver.get(page);
                 log.debug("Rendering page {} with element '{}'", page, elementSelector);
                 WebDriverWait wait = new WebDriverWait(driver, Duration.ZERO);
-                wait.withTimeout(Duration.of(30, ChronoUnit.SECONDS));
-                wait.until(d -> ((JavascriptExecutor) d).executeScript(
-                    """
-                    if (document.readyState !== 'complete')
-                        return false;
-                    const images = document.images
-                    for (let i = 0; i < images.length; i++) {
-                        if (!images[i].complete)
+                wait.withTimeout(Duration.of(timeout, ChronoUnit.SECONDS));
+                try {
+                    wait.until(d -> ((JavascriptExecutor) d).executeScript(
+                        """
+                        if (document.readyState !== 'complete')
                             return false;
-                    }
-                    return true;
-                    """
-                ));
+                        const images = document.images
+                        for (let i = 0; i < images.length; i++) {
+                            if (!images[i].complete)
+                                return false;
+                        }
+                        return true;
+                        """
+                    ));
+                } catch (TimeoutException timeoutException) {
+                    log.warn("Page {} loading timeout", page);
+                }
                 log.debug("Page {} loaded", page);
 
                 By element = By.cssSelector(elementSelector);
