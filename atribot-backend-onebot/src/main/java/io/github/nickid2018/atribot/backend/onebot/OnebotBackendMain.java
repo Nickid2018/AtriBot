@@ -7,6 +7,7 @@ import io.github.nickid2018.atribot.network.PacketRegister;
 import io.github.nickid2018.atribot.network.message.TransactionQueue;
 import io.github.nickid2018.atribot.util.ClassPathDependencyResolver;
 import io.github.nickid2018.atribot.util.Configuration;
+import io.github.nickid2018.atribot.util.LogUtil;
 import lombok.SneakyThrows;
 
 import java.net.InetAddress;
@@ -19,6 +20,7 @@ public class OnebotBackendMain {
         if (ClassPathDependencyResolver.inProductionEnvironment(OnebotBackendMain.class))
             ClassPathDependencyResolver.resolveCoreDependencies();
 
+        LogUtil.redirectJULToSLF4J();
         Configuration.init();
 
         BotConfig config = new BotConfig();

@@ -9,6 +9,7 @@ import io.github.nickid2018.atribot.network.message.TransactionQueue;
 import io.github.nickid2018.atribot.network.packet.backend.MessagePacket;
 import io.github.nickid2018.atribot.util.ClassPathDependencyResolver;
 import io.github.nickid2018.atribot.util.Configuration;
+import io.github.nickid2018.atribot.util.LogUtil;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,6 +24,7 @@ public class ConsoleBackendMain {
         if (ClassPathDependencyResolver.inProductionEnvironment(ConsoleBackendMain.class))
             ClassPathDependencyResolver.resolveCoreDependencies();
 
+        LogUtil.redirectJULToSLF4J();
         Configuration.init();
 
         ConsoleBackendListener listener = new ConsoleBackendListener();

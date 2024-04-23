@@ -6,6 +6,7 @@ import io.github.nickid2018.atribot.core.plugin.PluginClassLoader;
 import io.github.nickid2018.atribot.core.plugin.PluginManager;
 import io.github.nickid2018.atribot.util.ClassPathDependencyResolver;
 import io.github.nickid2018.atribot.util.Configuration;
+import io.github.nickid2018.atribot.util.LogUtil;
 import lombok.SneakyThrows;
 
 import java.util.Scanner;
@@ -17,6 +18,7 @@ public class AtriBotMain {
             ClassPathDependencyResolver.resolveCoreDependencies();
 
         PluginClassLoader.preloadAllClassesForCore();
+        LogUtil.redirectJULToSLF4J();
         Configuration.init();
         if (Configuration.hasKey("proxy")) {
             System.setProperty("http.proxyHost", Configuration.getStringOrElse("proxy.host", "localhost"));

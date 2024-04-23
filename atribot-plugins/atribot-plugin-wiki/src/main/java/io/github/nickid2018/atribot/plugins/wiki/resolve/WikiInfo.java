@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -30,10 +31,17 @@ public class WikiInfo {
         "siprop", "extensions|general|namespaces|namespacealiases"
     );
 
+    public static final Map<String, String> PAGE_BASE_QUERY = Map.of(
+        "action", "query",
+        "format", "json",
+        "prop", "info",
+        "redirects", "1"
+    );
+
     public static final Map<String, String> PAGE_QUERY = Map.of(
         "action", "query",
         "format", "json",
-        "prop", "info|imageinfo|pageprops",
+        "prop", "info|imageinfo|pageprops|templates",
         "ppprop", "disambiguation",
         "iiprop", "url|mime",
         "redirects", "1"
@@ -73,6 +81,7 @@ public class WikiInfo {
     public static final Predicate<String> ANONYMOUS_USER_PAGE = Pattern
         .compile("\\d{1,3}(\\.\\d{1,3}){3}")
         .asMatchPredicate();
+    public static final Pattern DOCUMENTATION_TEMPLATE = Pattern.compile("\\{\\{[Dd]ocumentation(\\|\\s\\S+?)?}}");
 
     public static final String ATRIBOT_WIKI_PLUGIN_UA = "Atribot Wiki Plugin/1.0";
 
@@ -279,9 +288,57 @@ public class WikiInfo {
                 return PageInfo.filePage(searchTitle, resolveScriptURL(pageID, section), fileAndMIME);
             }
 
+            List<String> useTemplates = page
+                .getAsJsonArray("templates")
+                .asList().stream()
+                .map(element -> element.getAsJsonObject().get("title").getAsString())
+                .toList();
+            boolean hasDocumentation = useTemplates.contains("Template:Documentation");
+            boolean isScribunto = page.get("contentmodel").getAsString().equals("Scribunto");
+
+            if (hasDocumentation || isScribunto)
+                section = null;
+
+            String makeDescTitle = searchTitle;
+            if (hasDocumentation) {
+                Map<String, String> parseQuery = new HashMap<>(PAGE_PARSE);
+                parseQuery.put("page", searchTitle);
+                HttpGet parseGet = new HttpGet(apiURL + WebUtil.formatQuery(parseQuery));
+                JsonObject pageParse = WebUtil
+                    .fetchDataInJson(parseGet, ATRIBOT_WIKI_PLUGIN_UA, false)
+                    .getAsJsonObject();
+                String parse = JsonUtil.getStringInPath(pageParse, "parse.wikitext.*").orElseThrow();
+                Matcher matcher = DOCUMENTATION_TEMPLATE.matcher(parse);
+                if (matcher.find()) {
+                    String documentation = matcher.group();
+                    if (documentation.contains("|"))
+                        makeDescTitle = documentation.substring(16, documentation.indexOf('|'));
+                    else
+                        makeDescTitle = searchTitle + "/doc";
+                } else {
+                    return PageInfo.withDocument(searchTitle, resolveScriptURL(pageID, null), false, "");
+                }
+            }
+
+            if (isScribunto) {
+                makeDescTitle = searchTitle + "/doc";
+                Map<String, String> baseQuery = new HashMap<>(PAGE_BASE_QUERY);
+                baseQuery.put("titles", makeDescTitle);
+                HttpGet baseGet = new HttpGet(apiURL + WebUtil.formatQuery(baseQuery));
+                JsonObject baseData = WebUtil
+                    .fetchDataInJson(baseGet, ATRIBOT_WIKI_PLUGIN_UA, false)
+                    .getAsJsonObject();
+                JsonObject basePages = baseData.getAsJsonObject("query").getAsJsonObject("pages");
+                if (basePages.isEmpty())
+                    return PageInfo.withDocument(searchTitle, resolveScriptURL(pageID, null), false, "");
+                JsonObject basePage = basePages.entrySet().iterator().next().getValue().getAsJsonObject();
+                if (basePage.has("missing"))
+                    return PageInfo.withDocument(searchTitle, resolveScriptURL(pageID, null), false, "");
+            }
+
             if (extensions.contains("TextExtracts") && (section == null || section.isEmpty())) {
                 Map<String, String> extractQuery = new HashMap<>(PAGE_TEXT_EXTRACTS);
-                extractQuery.put("titles", searchTitle);
+                extractQuery.put("titles", makeDescTitle);
                 HttpGet extractGet = new HttpGet(apiURL + WebUtil.formatQuery(extractQuery));
                 JsonObject pageExtracts = WebUtil
                     .fetchDataInJson(extractGet, ATRIBOT_WIKI_PLUGIN_UA, false)
@@ -291,11 +348,13 @@ public class WikiInfo {
                     .orElseThrow();
                 JsonObject pageExtract = pagesExtracts.entrySet().iterator().next().getValue().getAsJsonObject();
                 String extract = pageExtract.get("extract").getAsString();
-                return PageInfo.normalPage(searchTitle, null, null, resolveScriptURL(pageID, null), extract);
+                return hasDocumentation || isScribunto
+                       ? PageInfo.withDocument(searchTitle, resolveScriptURL(pageID, null), true, extract)
+                       : PageInfo.normalPage(searchTitle, null, null, resolveScriptURL(pageID, null), extract);
             }
 
             Map<String, String> parseQuery = new HashMap<>(PAGE_PARSE);
-            parseQuery.put("page", searchTitle);
+            parseQuery.put("page", makeDescTitle);
 
             if (section != null && !section.isEmpty()) {
                 Map<String, String> sectionQuery = new HashMap<>(PAGE_PARSE_SECTIONS);
@@ -330,13 +389,15 @@ public class WikiInfo {
             if (section != null && !section.isEmpty())
                 parse = parse.substring(parse.indexOf('\n')).trim();
             parse = parse.substring(0, parse.indexOf('\n'));
-            return PageInfo.normalPage(
-                searchTitle,
-                section,
-                parseQuery.get("section"),
-                resolveScriptURL(pageID, section),
-                parse
-            );
+            return hasDocumentation || isScribunto
+                   ? PageInfo.withDocument(searchTitle, resolveScriptURL(pageID, null), true, parse)
+                   : PageInfo.normalPage(
+                       searchTitle,
+                       section,
+                       parseQuery.get("section"),
+                       resolveScriptURL(pageID, section),
+                       parse
+                   );
         } catch (Exception e) {
             return PageInfo.networkError(searchTitle, e);
         }

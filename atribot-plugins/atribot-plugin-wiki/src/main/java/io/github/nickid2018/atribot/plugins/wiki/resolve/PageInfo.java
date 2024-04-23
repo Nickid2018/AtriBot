@@ -17,6 +17,15 @@ public record PageInfo(PageType type, Map<String, Object> data) {
         ));
     }
 
+    public static PageInfo withDocument(String pageName, String pageURL, boolean hasDoc, String desc) {
+        return new PageInfo(PageType.WITH_DOCUMENT, Map.of(
+            "pageName", pageName,
+            "pageURL", pageURL,
+            "hasDoc", hasDoc,
+            "desc", desc
+        ));
+    }
+
     public static PageInfo normalizePage(String pageNameSource, String pageNameRedirected, String pageURL, PageInfo pageInfo) {
         return new PageInfo(PageType.NORMALIZED, Map.of(
             "pageNameSource", pageNameSource,

@@ -47,27 +47,36 @@ public class WebRendererReceiver implements CommunicateReceiver {
         IntIntPair windowSize = data.containsKey("windowSize") ? (IntIntPair) data.get("windowSize") : null;
         return (CompletableFuture<T>) CompletableFuture.supplyAsync(() -> {
             RemoteWebDriver driver = plugin.createNewDriver();
+            try {
+                if (windowSize != null)
+                    driver.manage().window().setSize(new Dimension(windowSize.leftInt(), windowSize.rightInt()));
+                else
+                    driver.manage().window().maximize();
 
-            if (windowSize != null)
-                driver.manage().window().setSize(new Dimension(windowSize.leftInt(), windowSize.rightInt()));
-            else
-                driver.manage().window().maximize();
+                driver.get(page);
+                log.debug("Rendering page {} with element '{}'", page, elementSelector);
+                WebDriverWait wait = new WebDriverWait(driver, Duration.ZERO);
+                wait.withTimeout(Duration.of(30, ChronoUnit.SECONDS));
+                wait.until(d -> ((JavascriptExecutor) d).executeScript(
+                    """
+                    if (document.readyState !== 'complete')
+                        return false;
+                    const images = document.images
+                    for (let i = 0; i < images.length; i++) {
+                        if (!images[i].complete)
+                            return false;
+                    }
+                    return true;
+                    """
+                ));
+                log.debug("Page {} loaded", page);
 
-            driver.get(page);
-            log.debug("Rendering page {} with element '{}'", page, elementSelector);
-            WebDriverWait wait = new WebDriverWait(driver, Duration.of(10, ChronoUnit.SECONDS));
-            wait.until(d -> ((JavascriptExecutor) d).executeScript(
-                "return document.readyState"
-            ).equals("complete"));
-            log.debug("Page {} loaded", page);
-
-            By element = By.cssSelector(elementSelector);
-            WebElement webElement = driver.findElement(element);
-            byte[] screenshot = webElement.getScreenshotAs(OutputType.BYTES);
-
-            driver.quit();
-
-            return screenshot;
+                By element = By.cssSelector(elementSelector);
+                WebElement webElement = driver.findElement(element);
+                return webElement.getScreenshotAs(OutputType.BYTES);
+            } finally {
+                driver.quit();
+            }
         }, plugin.getRendererExecutor());
     }
 

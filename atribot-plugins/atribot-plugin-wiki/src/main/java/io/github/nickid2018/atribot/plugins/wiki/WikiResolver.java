@@ -10,10 +10,7 @@ import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.plugins.wiki.persist.StartWikiEntry;
 import io.github.nickid2018.atribot.plugins.wiki.persist.WikiEntry;
-import io.github.nickid2018.atribot.plugins.wiki.resolve.InterwikiStorage;
-import io.github.nickid2018.atribot.plugins.wiki.resolve.PageInfo;
-import io.github.nickid2018.atribot.plugins.wiki.resolve.PageShooter;
-import io.github.nickid2018.atribot.plugins.wiki.resolve.WikiInfo;
+import io.github.nickid2018.atribot.plugins.wiki.resolve.*;
 import io.github.nickid2018.atribot.util.FunctionUtil;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
@@ -244,6 +241,8 @@ public class WikiResolver implements CommunicateReceiver {
             lastWikiInfo = wikiInfo;
             lastFoundPageInfo = wikiInfo.parsePageInfo(namespace, title, section);
             lastInterwiki = interwiki;
+            if (lastFoundPageInfo.type() == PageType.PAGE_NOT_FOUND && namespace != null)
+                lastFoundPageInfo = wikiInfo.parsePageInfo(null, namespace + ":" + title, section);
         }
 
         if (!lastInterwiki.isEmpty())
@@ -256,16 +255,33 @@ public class WikiResolver implements CommunicateReceiver {
             return;
         }
 
-        processPageInfo(lastFoundPageInfo, lastWikiInfo, lastInterwiki, "", backendID, targetData, manager, wikiEntry);
+        processPageInfo(
+            lastFoundPageInfo,
+            lastWikiInfo,
+            lastInterwiki,
+            "",
+            backendID,
+            targetData,
+            manager,
+            wikiEntry
+        );
     }
 
-    private void processPageInfo(PageInfo info, WikiInfo wikiInfo, String interwiki, String prependStr,
-        String backendID, TargetData targetData, MessageManager manager, WikiEntry wikiEntry) {
+    private void processPageInfo(PageInfo info, WikiInfo wikiInfo, String interwiki,
+        String prependStr, String backendID, TargetData targetData, MessageManager manager, WikiEntry wikiEntry) {
         Map<String, Object> data = info.data();
         StringBuilder message = new StringBuilder(prependStr);
         switch (info.type()) {
             case NORMAL -> {
                 message.append(data.get("content"));
+                message.append("\n");
+                message.append(data.get("pageURL"));
+            }
+            case WITH_DOCUMENT -> {
+                if ((boolean) data.get("hasDoc"))
+                    message.append(data.get("desc"));
+                else
+                    message.append("[注意：此页面没有文档！]");
                 message.append("\n");
                 message.append(data.get("pageURL"));
             }
@@ -381,6 +397,12 @@ public class WikiResolver implements CommunicateReceiver {
                         plugin,
                         wikiEntry
                     ));
+                case WITH_DOCUMENT -> (boolean) data.get("hasDoc") ?
+                                      (Function<PageShooter, CompletableFuture<byte[]>>) (shooter -> shooter.renderDoc(
+                                          plugin,
+                                          wikiEntry
+                                      )) :
+                                      null;
                 default -> null;
             },
             (String) data.get("pageURL"),

@@ -113,7 +113,8 @@ public class PageShooter {
     private static final Map<String, String> PAGE_PARSE_HTML = Map.of(
         "action", "parse",
         "format", "json",
-        "prop", "text"
+        "prop", "text",
+        "preview", "true"
     );
 
     public CompletableFuture<byte[]> renderFullPage(WikiPlugin plugin, WikiEntry wikiEntry) {
@@ -135,6 +136,7 @@ public class PageShooter {
                 Map<String, String> parseArgs = new HashMap<>(PAGE_PARSE_HTML);
                 parseArgs.put("page", page);
                 parseArgs.put("section", sectionID);
+                parseArgs.put("sectionpreview", "true");
                 JsonObject parseSectionHTML = WebUtil.fetchDataInJson(
                     new HttpGet(info.getApiURL() + WebUtil.formatQuery(parseArgs)),
                     WikiInfo.ATRIBOT_WIKI_PLUGIN_UA
@@ -155,10 +157,23 @@ public class PageShooter {
     );
 
     public CompletableFuture<byte[]> renderInfobox(WikiPlugin plugin, WikiEntry wikiEntry) {
+        return renderWithSpecialClass(plugin, wikiEntry, SUPPORT_INFOBOX, "infobox");
+    }
+
+    private static final List<String> SUPPORT_DOCUMENTATION = List.of(
+        "documentation", "template-documentation"
+    );
+
+    public CompletableFuture<byte[]> renderDoc(WikiPlugin plugin, WikiEntry wikiEntry) {
+        return renderWithSpecialClass(plugin, wikiEntry, SUPPORT_DOCUMENTATION, "documentation");
+    }
+
+    public CompletableFuture<byte[]> renderWithSpecialClass(WikiPlugin plugin, WikiEntry wikiEntry,
+        List<String> supportClasses, String name) {
         return CompletableFuture
             .supplyAsync(() -> {
                 Document doc = Jsoup.parse(sourceHTML);
-                Element found = SUPPORT_INFOBOX
+                Element found = supportClasses
                     .stream()
                     .map(doc::getElementsByClass)
                     .filter(Predicate.not(Elements::isEmpty))
@@ -167,11 +182,11 @@ public class PageShooter {
                     .orElse(null);
 
                 if (found == null) {
-                    log.debug("No infobox found in {}", url);
+                    log.debug("No {} found in {}", name, url);
                     return null;
                 }
 
-                String className = "infobox-render-%s".formatted(RandomStringUtils.random(32, true, true));
+                String className = "%s-render-%s".formatted(name, RandomStringUtils.random(32, true, true));
                 found.addClass(className);
                 cleanDocument(doc, found);
 
