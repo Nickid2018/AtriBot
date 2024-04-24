@@ -37,55 +37,35 @@ public class WikiResolver implements CommunicateReceiver {
         if (communicateKey.equals("atribot.message.command")) {
             CommandCommunicateData commandData = (CommandCommunicateData) data;
             switch (commandData.commandHead) {
-                case "wiki" -> plugin.getExecutorService().execute(noException(
-                    () -> requestWikiPage(
-                        commandData.commandArgs,
-                        commandData.backendID,
-                        commandData.targetData,
-                        commandData.messageManager
-                    ),
-                    commandData.backendID,
-                    commandData.targetData,
-                    commandData.messageManager
-                ));
-                case "wikiadd" -> plugin.getExecutorService().execute(noException(
-                    () -> addWiki(
-                        commandData.commandArgs,
-                        commandData.backendID,
-                        commandData.targetData,
-                        commandData.messageManager
-                    ),
-                    commandData.backendID,
-                    commandData.targetData,
-                    commandData.messageManager
-                ));
-                case "wikistart" -> plugin.getExecutorService().execute(noException(
-                    () -> setStartWiki(
-                        commandData.commandArgs,
-                        commandData.backendID,
-                        commandData.targetData,
-                        commandData.messageManager
-                    ),
-                    commandData.backendID,
-                    commandData.targetData,
-                    commandData.messageManager
-                ));
-                case "wikiremove" -> plugin.getExecutorService().execute(noException(
-                    () -> removeWiki(
-                        commandData.commandArgs,
-                        commandData.backendID,
-                        commandData.targetData,
-                        commandData.messageManager
-                    ),
-                    commandData.backendID,
-                    commandData.targetData,
-                    commandData.messageManager
-                ));
+                case "wiki" -> executeWikiCommand(commandData, this::requestWikiPage);
+                case "wikiadd" -> executeWikiCommand(commandData, this::addWiki);
+                case "wikistart" -> executeWikiCommand(commandData, this::setStartWiki);
+                case "wikiremove" -> executeWikiCommand(commandData, this::removeWiki);
+                case "wikirender" -> executeWikiCommand(commandData, this::setWikiRendering);
+                case "wikirandom" -> executeWikiCommand(commandData, this::randomPage);
                 default -> {
                 }
             }
         }
         return null;
+    }
+
+    private interface WikiCommand {
+        void execute(String[] args, String backendID, TargetData targetData, MessageManager manager);
+    }
+
+    private void executeWikiCommand(CommandCommunicateData data, WikiCommand command) {
+        plugin.getExecutorService().execute(noException(
+            () -> command.execute(
+                data.commandArgs,
+                data.backendID,
+                data.targetData,
+                data.messageManager
+            ),
+            data.backendID,
+            data.targetData,
+            data.messageManager
+        ));
     }
 
     private Runnable noException(FunctionUtil.RunnableWithException<? extends Throwable> runnable, String backendID, TargetData targetData, MessageManager manager) {
@@ -184,6 +164,46 @@ public class WikiResolver implements CommunicateReceiver {
     }
 
     @SneakyThrows
+    private void setWikiRendering(String[] args, String backendID, TargetData targetData, MessageManager manager) {
+        if (!manager.getPermissionManager().checkTargetData(targetData, PermissionLevel.SUPER_USER)) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：权限不足"));
+            return;
+        }
+
+        if (args.length < 2) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称或参数"));
+            return;
+        }
+
+        String wikiName = args[0];
+        String group = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
+        Optional<WikiEntry> wikiEntry = plugin.wikiEntries
+            .queryForEq("group", group)
+            .stream()
+            .filter(entry -> entry.wikiPrefix.equals(wikiName))
+            .findFirst();
+        if (wikiEntry.isEmpty()) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未找到对应 Wiki"));
+            return;
+        }
+
+        boolean makeRender = Boolean.parseBoolean(args[1]);
+        WikiEntry entry = wikiEntry.get();
+        entry.trustRender = makeRender;
+
+        DeleteBuilder<WikiEntry, Object> deleteBuilder = plugin.wikiEntries.deleteBuilder();
+        deleteBuilder.where().eq("group", group).and().eq("wiki_key", args[0]);
+        deleteBuilder.delete();
+        plugin.wikiEntries.create(entry);
+
+        manager.sendMessage(
+            backendID,
+            targetData,
+            MessageChain.text("Wiki：已" + (makeRender ? "允许 " : "禁止 ") + args[0] + " 渲染")
+        );
+    }
+
+    @SneakyThrows
     private void requestWikiPage(String[] args, String backendID, TargetData targetData, MessageManager manager) {
         if (args.length == 0) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定查询页面"));
@@ -265,6 +285,68 @@ public class WikiResolver implements CommunicateReceiver {
             targetData,
             manager,
             wikiEntry
+        );
+    }
+
+    @SneakyThrows
+    private void randomPage(String[] args, String backendID, TargetData targetData, MessageManager manager) {
+        if (args.length > 1) {
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：参数过多"));
+            return;
+        }
+
+        String target = targetData.isGroupMessage() ? targetData.getTargetGroup() : targetData.getTargetUser();
+        StartWikiEntry startWiki = plugin.startWikis.queryForId(target);
+        String wikiKey = startWiki == null ? null : startWiki.wikiKey;
+
+        WikiInfo wikiInfo = null;
+        List<WikiEntry> wikiEntries = plugin.wikiEntries.queryForEq("group", target);
+        WikiEntry startWikiEntry = wikiEntries
+            .stream()
+            .filter(entry -> entry.wikiPrefix.equals(wikiKey))
+            .findFirst()
+            .orElse(null);
+        if (args.length == 1) {
+            if (startWikiEntry != null) {
+                wikiInfo = interwikiStorage.getWikiInfo(startWikiEntry.baseURL, args[0]).get();
+            }
+            if (wikiInfo == null) {
+                int firstInterwikiSplit = args[0].indexOf(':');
+                if (firstInterwikiSplit < 0)
+                    firstInterwikiSplit = args[0].length();
+                String first = args[0].substring(0, firstInterwikiSplit);
+                WikiEntry nowWikiEntry = wikiEntries
+                    .stream()
+                    .filter(entry -> entry.wikiPrefix.equals(first))
+                    .findFirst()
+                    .orElse(null);
+                if (nowWikiEntry == null) {
+                    manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未找到对应 Wiki"));
+                    return;
+                }
+                String interwiki = firstInterwikiSplit == args[0].length() ? "" : args[0].substring(firstInterwikiSplit + 1);
+                wikiInfo = interwikiStorage.getWikiInfo(nowWikiEntry.baseURL, interwiki).get();
+            }
+        } else {
+            if (startWikiEntry == null) {
+                manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定起始 Wiki"));
+                return;
+            }
+            wikiInfo = interwikiStorage.getWikiInfo(startWikiEntry.baseURL, "").get();
+        }
+
+        String randomPage = wikiInfo.randomPage();
+        PageInfo pageInfo = wikiInfo.parsePageInfo(null, randomPage, null);
+        String interwiki = args.length == 1 ? args[0] + ":" : "";
+        processPageInfo(
+            pageInfo,
+            wikiInfo,
+            interwiki,
+            "（随机页面到 [[" + interwiki + randomPage + "]]）\n",
+            backendID,
+            targetData,
+            manager,
+            startWikiEntry
         );
     }
 

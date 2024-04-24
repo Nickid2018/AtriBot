@@ -29,6 +29,7 @@ public class ClassPathDependencyResolver {
         LIBRARY_PATH = new File(libraryPath);
 
         repositoryMap.add("https://repo1.maven.org/maven2/");
+        repositoryMap.add("https://jitpack.io/");
         repositoryMap.add("https://maven.nova-committee.cn/releases/");
 
         String repository = System.getenv("REPOSITORY");

@@ -78,6 +78,13 @@ public class WikiInfo {
         "srwhat", "text"
     );
 
+    public static final Map<String, String> RANDOM = Map.of(
+        "action", "query",
+        "format", "json",
+        "list", "random",
+        "rnnamespace", "0"
+    );
+
     public static final Predicate<String> ANONYMOUS_USER_PAGE = Pattern
         .compile("\\d{1,3}(\\.\\d{1,3}){3}")
         .asMatchPredicate();
@@ -154,14 +161,14 @@ public class WikiInfo {
     }
 
     public PageInfo parsePageInfo(String namespace, String title, String section) {
+        String searchTitle = namespace == null || namespace.isEmpty() ? title : namespace + ":" + title;
+
         if (!isWiki)
-            return PageInfo.directURL(resolveArticleURL(title, section));
+            return PageInfo.directURL(resolveArticleURL(searchTitle, section));
         if (title == null || title.isEmpty())
             return parsePageInfo(null, mainPageName, null);
         if (namespace != null && !namespaces.containsKey(namespace))
             return PageInfo.pageNotFound(namespace, new String[0]);
-
-        String searchTitle = namespace == null || namespace.isEmpty() ? title : namespace + ":" + title;
 
         if (ANONYMOUS_USER_PAGE.test(title))
             return PageInfo.anonymousUserPage(searchTitle);
@@ -288,11 +295,13 @@ public class WikiInfo {
                 return PageInfo.filePage(searchTitle, resolveScriptURL(pageID, section), fileAndMIME);
             }
 
-            List<String> useTemplates = page
-                .getAsJsonArray("templates")
-                .asList().stream()
-                .map(element -> element.getAsJsonObject().get("title").getAsString())
-                .toList();
+            List<String> useTemplates = page.has("templates")
+                                        ? page
+                                            .getAsJsonArray("templates")
+                                            .asList().stream()
+                                            .map(element -> element.getAsJsonObject().get("title").getAsString())
+                                            .toList()
+                                        : Collections.emptyList();
             boolean hasDocumentation = useTemplates.contains("Template:Documentation");
             boolean isScribunto = page.get("contentmodel").getAsString().equals("Scribunto");
 
@@ -430,5 +439,14 @@ public class WikiInfo {
             .map(obj -> obj.get("title"))
             .map(JsonElement::getAsString)
             .toArray(String[]::new);
+    }
+
+    @SneakyThrows
+    public String randomPage() {
+        HttpGet get = new HttpGet(apiURL + WebUtil.formatQuery(RANDOM));
+        JsonObject randomData = WebUtil.fetchDataInJson(get, ATRIBOT_WIKI_PLUGIN_UA, false).getAsJsonObject();
+        JsonArray random = JsonUtil.getDataInPath(randomData, "query.random", JsonArray.class).orElseThrow();
+        JsonObject page = random.get(0).getAsJsonObject();
+        return page.get("title").getAsString();
     }
 }
