@@ -4,9 +4,9 @@ import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.util.FunctionUtil;
-import io.github.nickid2018.smcl.Statement;
 import io.github.nickid2018.smcl.StatementParseException;
 import lombok.AllArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
@@ -23,18 +23,18 @@ public class CalcReceiver implements CommunicateReceiver {
     private static final Set<String> KEY = Set.of("atribot.message.command");
 
     @Override
+    @SneakyThrows
     public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) {
         CommandCommunicateData commandData = (CommandCommunicateData) data;
         if (commandData.commandHead.equals("calc")) {
             String statementStr = String.join(" ", commandData.commandArgs);
             Instant now = Instant.now();
+
             CompletableFuture
-                .supplyAsync(FunctionUtil.noException(
+                .supplyAsync(FunctionUtil.sneakyThrowsSupplier(
                     () -> plugin.getContext().parse(statementStr)
                 ), plugin.getExecutorService())
-                .thenApply(FunctionUtil.<Statement, Double>noException(
-                    statement -> statement.calculate(plugin.getDefaultVariables()).toStdNumber()
-                ))
+                .thenApply(statement -> statement.calculate(plugin.getDefaultVariables()).toStdNumber())
                 .orTimeout(5, TimeUnit.SECONDS)
                 .thenAccept(number -> commandData.messageManager.sendMessage(
                     commandData.backendID,

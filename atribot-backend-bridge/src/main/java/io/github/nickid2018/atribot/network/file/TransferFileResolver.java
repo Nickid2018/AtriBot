@@ -41,7 +41,7 @@ public class TransferFileResolver {
                 String randomName = RandomStringUtils.random(64, true, true);
                 File targetFile = transferArgs[0].equals(".") ? data : new File(transferFile, randomName);
                 File remoteFile = transferArgs[1].equals(".") ? data : new File(transferArgs[1], randomName);
-                return CompletableFuture.supplyAsync(FunctionUtil.noException(() -> {
+                return CompletableFuture.supplyAsync(FunctionUtil.sneakyThrowsSupplier(() -> {
                     if (!data.equals(targetFile)) {
                         targetFile.deleteOnExit();
                         FILE_TRANSFER_CACHE.put(randomName, targetFile.getAbsolutePath());
@@ -76,7 +76,7 @@ public class TransferFileResolver {
 
                 String remoteDir = isFirstDot && isSecondDot ? transferArgs[0] : transferArgs[1];
                 File remoteFile = new File(remoteDir, randomName);
-                return CompletableFuture.supplyAsync(FunctionUtil.noException(() -> {
+                return CompletableFuture.supplyAsync(FunctionUtil.sneakyThrowsSupplier(() -> {
                     OutputStream os = new FileOutputStream(targetFile);
                     IOUtils.copy(data, os);
                     os.close();

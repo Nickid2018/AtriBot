@@ -10,7 +10,6 @@ import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
-import io.github.nickid2018.atribot.util.BaseExceptions;
 import io.github.nickid2018.atribot.util.FunctionUtil;
 import io.github.nickid2018.atribot.util.JsonUtil;
 import io.github.nickid2018.atribot.util.WebUtil;
@@ -20,6 +19,8 @@ import org.apache.hc.client5.http.classic.methods.HttpGet;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import java.util.stream.StreamSupport;
 
@@ -138,7 +139,7 @@ public class WakatimeReceiver implements CommunicateReceiver {
                     "scopes", List.of("read_logged_time")
                 )
             )
-            .thenAcceptAsync(FunctionUtil.noExceptionOrElse(accessToken -> {
+            .thenAcceptAsync(FunctionUtil.tryOrElse(accessToken -> {
                 HttpGet get = new HttpGet("https://wakatime.com/api/v1/users/current/stats/last_7_days");
                 get.setHeader("Authorization", "Bearer " + accessToken);
                 JsonObject data = WebUtil.fetchDataInJson(get).getAsJsonObject().getAsJsonObject("data");
@@ -192,7 +193,7 @@ public class WakatimeReceiver implements CommunicateReceiver {
                     "scopes", List.of("read_logged_time")
                 )
             )
-            .thenAcceptAsync(FunctionUtil.noExceptionOrElse(accessToken -> {
+            .thenAcceptAsync(FunctionUtil.tryOrElse(accessToken -> {
                 HttpGet get = new HttpGet(url);
                 get.addHeader("Authorization", "Bearer " + accessToken);
 
@@ -267,8 +268,11 @@ public class WakatimeReceiver implements CommunicateReceiver {
     }
 
     private <T> T whenAuthError(Throwable t, String backendID, MessageManager manager, TargetData targetData) {
-        if (BaseExceptions.isGeneralTimeout(t.getCause())) {
+        if (t instanceof TimeoutException) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wakatime：授权超时"));
+        } else if (t instanceof ExecutionException) {
+            log.error("Error in fetching data", t);
+            manager.sendMessage(backendID, targetData, MessageChain.text("Wakatime：授权错误：" + t.getCause().getMessage()));
         } else {
             log.error("Error in fetching data", t);
             manager.sendMessage(backendID, targetData, MessageChain.text("Wakatime：授权错误：" + t.getMessage()));

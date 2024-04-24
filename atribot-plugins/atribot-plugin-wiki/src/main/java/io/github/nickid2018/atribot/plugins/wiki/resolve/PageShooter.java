@@ -143,7 +143,7 @@ public class PageShooter {
 
     public CompletableFuture<byte[]> renderSection(WikiPlugin plugin, String page, String sectionID, WikiInfo info, WikiEntry wikiEntry) {
         return CompletableFuture
-            .supplyAsync(FunctionUtil.noException(() -> {
+            .supplyAsync(FunctionUtil.sneakyThrowsSupplier(() -> {
                 Document doc = Jsoup.parse(sourceHTML);
 
                 Map<String, String> parseArgs = new HashMap<>(PAGE_PARSE_HTML);

@@ -1,5 +1,7 @@
 package io.github.nickid2018.atribot.util;
 
+import lombok.SneakyThrows;
+
 import java.util.function.*;
 
 public class FunctionUtil {
@@ -24,21 +26,21 @@ public class FunctionUtil {
         void run() throws E;
     }
 
-    public static Runnable noException(RunnableWithException<?> runnable) {
-        return noException(runnable, RuntimeException::new);
+    public static Runnable sneakyThrowsRunnable(RunnableWithException<?> runnable) {
+        return new Runnable() {
+            @Override
+            @SneakyThrows
+            public void run() {
+                runnable.run();
+            }
+        };
     }
 
-    public static Runnable noException(RunnableWithException<?> runnable, Function<Throwable, RuntimeException> exceptionMapper) {
-        return noExceptionOrElse(runnable, e -> {
-            throw exceptionMapper.apply(e);
-        });
+    public static Runnable tryOrElse(RunnableWithException<?> runnable, Runnable exceptionCase) {
+        return tryOrElse(runnable, e -> exceptionCase.run());
     }
 
-    public static Runnable noExceptionOrElse(RunnableWithException<?> runnable, Runnable exceptionCase) {
-        return noExceptionOrElse(runnable, e -> exceptionCase.run());
-    }
-
-    public static Runnable noExceptionOrElse(RunnableWithException<?> runnable, Consumer<Throwable> exceptionCase) {
+    public static Runnable tryOrElse(RunnableWithException<?> runnable, Consumer<Throwable> exceptionCase) {
         return () -> {
             try {
                 runnable.run();
@@ -62,21 +64,21 @@ public class FunctionUtil {
         };
     }
 
-    public static <S, T> Function<S, T> noException(FunctionWithException<S, T, ?> function) {
-        return noException(function, RuntimeException::new);
+    public static <S, T> Function<S, T> sneakyThrowsFunc(FunctionWithException<S, T, ?> function) {
+        return new Function<>() {
+            @Override
+            @SneakyThrows
+            public T apply(S s) {
+                return function.apply(s);
+            }
+        };
     }
 
-    public static <S, T> Function<S, T> noException(FunctionWithException<S, T, ?> function, Function<Throwable, RuntimeException> exceptionMapper) {
-        return noExceptionOrElse(function, (s, e) -> {
-            throw exceptionMapper.apply(e);
-        });
+    public static <S, T> Function<S, T> tryOrElse(FunctionWithException<S, T, ?> function, Function<S, T> exceptionCase) {
+        return tryOrElse(function, (s, e) -> exceptionCase.apply(s));
     }
 
-    public static <S, T> Function<S, T> noExceptionOrElse(FunctionWithException<S, T, ?> function, Function<S, T> exceptionCase) {
-        return noExceptionOrElse(function, (s, e) -> exceptionCase.apply(s));
-    }
-
-    public static <S, T> Function<S, T> noExceptionOrElse(FunctionWithException<S, T, ?> function, BiFunction<S, Throwable, T> exceptionCase) {
+    public static <S, T> Function<S, T> tryOrElse(FunctionWithException<S, T, ?> function, BiFunction<S, Throwable, T> exceptionCase) {
         return s -> {
             try {
                 return function.apply(s);
@@ -86,21 +88,21 @@ public class FunctionUtil {
         };
     }
 
-    public static <T> Consumer<T> noException(ConsumerWithException<T, ?> consumer) {
-        return noException(consumer, RuntimeException::new);
+    public static <T> Consumer<T> sneakyThrowsConsumer(ConsumerWithException<T, ? extends Throwable> consumer) {
+        return new Consumer<T>() {
+            @Override
+            @SneakyThrows
+            public void accept(T t) {
+                consumer.accept(t);
+            }
+        };
     }
 
-    public static <T> Consumer<T> noException(ConsumerWithException<T, ?> consumer, Function<Throwable, RuntimeException> exceptionMapper) {
-        return noExceptionOrElse(consumer, (t, e) -> {
-            throw exceptionMapper.apply(e);
-        });
+    public static <T> Consumer<T> tryOrElse(ConsumerWithException<T, ?> consumer, Consumer<T> exceptionCase) {
+        return tryOrElse(consumer, (t, e) -> exceptionCase.accept(t));
     }
 
-    public static <T> Consumer<T> noExceptionOrElse(ConsumerWithException<T, ?> consumer, Consumer<T> exceptionCase) {
-        return noExceptionOrElse(consumer, (t, e) -> exceptionCase.accept(t));
-    }
-
-    public static <T> Consumer<T> noExceptionOrElse(ConsumerWithException<T, ?> consumer, BiConsumer<T, Throwable> exceptionCase) {
+    public static <T> Consumer<T> tryOrElse(ConsumerWithException<T, ?> consumer, BiConsumer<T, Throwable> exceptionCase) {
         return t -> {
             try {
                 consumer.accept(t);
@@ -124,7 +126,7 @@ public class FunctionUtil {
         };
     }
 
-    public static <T> Supplier<T> tryUntil(SupplierWithException<T, ?> supplier, int times, Function<Throwable , T> exceptionCase) {
+    public static <T> Supplier<T> tryUntil(SupplierWithException<T, ?> supplier, int times, Function<Throwable, T> exceptionCase) {
         return () -> {
             for (int i = 0; i < times; i++) {
                 try {
@@ -138,21 +140,21 @@ public class FunctionUtil {
         };
     }
 
-    public static <T> Supplier<T> noException(SupplierWithException<T, ?> supplier) {
-        return noException(supplier, RuntimeException::new);
+    public static <T> Supplier<T> sneakyThrowsSupplier(SupplierWithException<T, ?> supplier) {
+        return new Supplier<T>() {
+            @Override
+            @SneakyThrows
+            public T get() {
+                return supplier.get();
+            }
+        };
     }
 
-    public static <T> Supplier<T> noException(SupplierWithException<T, ?> supplier, Function<Throwable, RuntimeException> exceptionMapper) {
-        return noExceptionOrElse(supplier, e -> {
-            throw exceptionMapper.apply(e);
-        });
+    public static <T> Supplier<T> tryOrElse(SupplierWithException<T, ?> supplier, Supplier<T> exceptionCase) {
+        return tryOrElse(supplier, e -> exceptionCase.get());
     }
 
-    public static <T> Supplier<T> noExceptionOrElse(SupplierWithException<T, ?> supplier, Supplier<T> exceptionCase) {
-        return noExceptionOrElse(supplier, e -> exceptionCase.get());
-    }
-
-    public static <T> Supplier<T> noExceptionOrElse(SupplierWithException<T, ?> supplier, Function<Throwable, T> exceptionCase) {
+    public static <T> Supplier<T> tryOrElse(SupplierWithException<T, ?> supplier, Function<Throwable, T> exceptionCase) {
         return () -> {
             try {
                 return supplier.get();

@@ -69,7 +69,7 @@ public class WikiResolver implements CommunicateReceiver {
     }
 
     private Runnable noException(FunctionUtil.RunnableWithException<? extends Throwable> runnable, String backendID, TargetData targetData, MessageManager manager) {
-        return FunctionUtil.noExceptionOrElse(runnable, e -> {
+        return FunctionUtil.tryOrElse(runnable, e -> {
             manager.sendMessage(
                 backendID,
                 targetData,

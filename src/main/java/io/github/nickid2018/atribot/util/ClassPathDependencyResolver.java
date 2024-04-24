@@ -176,7 +176,7 @@ public class ClassPathDependencyResolver {
         return parsedDependencies
             .stream()
             .map(File::toURI)
-            .map(FunctionUtil.noException(URI::toURL))
+            .map(FunctionUtil.sneakyThrowsFunc(URI::toURL))
             .toArray(URL[]::new);
     }
 

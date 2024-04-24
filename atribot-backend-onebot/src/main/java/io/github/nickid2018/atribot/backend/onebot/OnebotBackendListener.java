@@ -200,7 +200,7 @@ public class OnebotBackendListener implements NetworkListener, Listener {
     private MessageChain parseMessage(String messages) {
         MessageChain messageChain = new MessageChain();
         JsonArray array = JsonParser.parseString(messages).getAsJsonArray();
-        array.forEach(FunctionUtil.noException(arrayMsg -> {
+        array.forEach(FunctionUtil.sneakyThrowsConsumer(arrayMsg -> {
             JsonObject obj = arrayMsg.getAsJsonObject();
             String typeStr = JsonUtil.getStringOrElse(obj, "type", "text");
             switch (typeStr) {
@@ -231,7 +231,7 @@ public class OnebotBackendListener implements NetworkListener, Listener {
 
     private String parseMsg(MessageChain messageChain) {
         MsgUtils builder = MsgUtils.builder();
-        messageChain.getMessages().forEach(FunctionUtil.noException(message -> {
+        messageChain.getMessages().forEach(FunctionUtil.sneakyThrowsConsumer(message -> {
             switch (message) {
                 case TextMessage textMessage -> builder.text(textMessage.getText());
                 case ImageMessage imageMessage -> builder.img(imageMessage.getResolved().toURL().toString());

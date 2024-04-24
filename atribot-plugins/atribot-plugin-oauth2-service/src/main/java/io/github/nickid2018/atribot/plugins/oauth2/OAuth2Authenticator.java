@@ -75,7 +75,7 @@ public class OAuth2Authenticator implements HttpHandler {
             exchange.sendResponseHeaders(200, data.length);
             exchange.getResponseBody().write(data);
 
-            plugin.getExecutorService().execute(FunctionUtil.noException(() -> {
+            plugin.getExecutorService().execute(FunctionUtil.sneakyThrowsRunnable(() -> {
                 String code = args.get("code");
                 HttpPost post = new HttpPost(tokenGrantURL);
                 post.setHeader("Accept", "application/json");
@@ -152,7 +152,7 @@ public class OAuth2Authenticator implements HttpHandler {
                 post.setEntity(entity);
 
                 return CompletableFuture
-                    .supplyAsync(FunctionUtil.noException(() -> {
+                    .supplyAsync(FunctionUtil.sneakyThrowsSupplier(() -> {
                         JsonObject object = WebUtil.fetchDataInJson(post).getAsJsonObject();
                         String accessToken = JsonUtil.getStringOrNull(object, "access_token");
                         String refreshToken = JsonUtil.getStringOrNull(object, "refresh_token");
@@ -203,13 +203,13 @@ public class OAuth2Authenticator implements HttpHandler {
 
         CompletableFuture<String> future = new CompletableFuture<String>()
             .orTimeout(10, TimeUnit.MINUTES)
-            .exceptionallyAsync(t -> {
+            .exceptionallyAsync(FunctionUtil.sneakyThrowsFunc(t -> {
                 if (t instanceof TimeoutException) {
                     authSequence.remove(state);
-                    throw BaseExceptions.GENERAL_TIMEOUT_EXCEPTION;
+                    throw t;
                 } else
                     throw new RuntimeException("Impossible error", t);
-            }, plugin.getExecutorService());
+            }), plugin.getExecutorService());
         authSequence.put(state, Triple.of(target.getTargetUser(), scopes, future));
         manager.sendMessage(
             backendID,
@@ -229,7 +229,7 @@ public class OAuth2Authenticator implements HttpHandler {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Token not found"));
         AuthenticateToken token = tokenDao.queryForId(id);
 
-        return CompletableFuture.runAsync(FunctionUtil.noException(() -> {
+        return CompletableFuture.runAsync(FunctionUtil.sneakyThrowsRunnable(() -> {
             HttpPost post = new HttpPost(revokeURL);
             post.setHeader("Accept", "application/json");
 

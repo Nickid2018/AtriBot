@@ -27,7 +27,7 @@ public class PluginManager {
                   .map(File::getName)
                   .filter(name -> name.endsWith(".jar"))
                   .map(s -> s.substring(0, s.length() - 4))
-                  .forEach(FunctionUtil.noExceptionOrElse(
+                  .forEach(FunctionUtil.tryOrElse(
                       PluginManager::preLoadPlugin,
                       (s, e) -> log.error("Failed to preload plugin: {}", s, e)
                   ));
@@ -42,7 +42,7 @@ public class PluginManager {
                 .filter(clzInfo -> clzInfo.getPackageName().startsWith("io.github.nickid2018.atribot.plugin"))
                 .map(ClassPath.ClassInfo::load)
                 .filter(AtriBotPlugin.class::isAssignableFrom)
-                .forEach(FunctionUtil.noExceptionOrElse(
+                .forEach(FunctionUtil.tryOrElse(
                     clazz -> {
                         AtriBotPlugin plugin = (AtriBotPlugin) clazz.getConstructor().newInstance();
                         log.info("Add dev plugin: {}", clazz.getSimpleName());
@@ -89,7 +89,7 @@ public class PluginManager {
                 .map(JarEntry::getName)
                 .filter(s -> s.endsWith(".class"))
                 .map(s -> s.substring(0, s.length() - 6).replace('/', '.'))
-                .map(FunctionUtil.noExceptionOrElse(classLoader::loadClass, c -> null))
+                .map(FunctionUtil.tryOrElse(classLoader::loadClass, c -> null))
                 .filter(Objects::nonNull)
                 .filter(AtriBotPlugin.class::isAssignableFrom)
                 .toList();
@@ -146,7 +146,7 @@ public class PluginManager {
     }
 
     public static void unloadAll() {
-        forEachPluginNamesOutPlace(FunctionUtil.noExceptionOrElse(
+        forEachPluginNamesOutPlace(FunctionUtil.tryOrElse(
             PluginManager::unloadPlugin,
             (s, e) -> log.error("Failed to unload plugin: {}", s, e)
         ));
