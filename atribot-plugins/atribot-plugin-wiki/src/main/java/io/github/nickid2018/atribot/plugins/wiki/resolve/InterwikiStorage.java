@@ -103,7 +103,7 @@ public class InterwikiStorage {
         for (int i = 0; i < object.size(); i++) {
             JsonObject interwiki = object.get(i).getAsJsonObject();
             String name = interwiki.get("prefix").getAsString();
-            String url = interwiki.get("url").getAsString();
+            String url = interwiki.get("url").getAsString().replace(' ', '_');
 
             HttpGet toCheck = new HttpGet(url);
             map.put(name, CompletableFuture.supplyAsync(FunctionUtil.tryUntil(() -> {

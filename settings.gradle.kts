@@ -16,6 +16,7 @@ includeProject("atribot-plugin-mc-ping", "atribot-plugins/atribot-plugin-mc-ping
 includeProject("atribot-plugin-wiki", "atribot-plugins/atribot-plugin-wiki")
 includeProject("atribot-plugin-web-renderer", "atribot-plugins/atribot-plugin-web-renderer")
 includeProject("atribot-plugin-calc", "atribot-plugins/atribot-plugin-calc")
+includeProject("atribot-plugin-bilibili", "atribot-plugins/atribot-plugin-bilibili")
 
 // Backends Here
 includeProject("atribot-backend-console") // Test Console Backend

@@ -170,6 +170,9 @@ public class WikiInfo {
         if (namespace != null && !namespaces.containsKey(namespace))
             return PageInfo.pageNotFound(namespace, new String[0]);
 
+        if (section != null && !section.isEmpty())
+            section = section.replace(' ', '_');
+
         if (ANONYMOUS_USER_PAGE.test(title))
             return PageInfo.anonymousUserPage(searchTitle);
 
@@ -387,7 +390,11 @@ public class WikiInfo {
                 if (sectionMap.containsKey(section)) {
                     parseQuery.put("section", sectionMap.get(section));
                 } else {
-                    String[] availableSections = sectionMap.keySet().toArray(new String[0]);
+                    String[] availableSections = sectionMap
+                        .keySet()
+                        .stream()
+                        .map(s -> s.replace('_', ' '))
+                        .toArray(String[]::new);
                     return PageInfo.sectionNotFound(searchTitle, resolveScriptURL(pageID, null), availableSections);
                 }
             }

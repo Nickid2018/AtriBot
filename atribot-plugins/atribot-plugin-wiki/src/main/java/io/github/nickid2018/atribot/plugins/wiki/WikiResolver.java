@@ -3,11 +3,13 @@ package io.github.nickid2018.atribot.plugins.wiki;
 import com.j256.ormlite.stmt.DeleteBuilder;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
+import io.github.nickid2018.atribot.core.message.MessageCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
 import io.github.nickid2018.atribot.core.message.PermissionLevel;
 import io.github.nickid2018.atribot.network.message.ImageMessage;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
+import io.github.nickid2018.atribot.network.message.TextMessage;
 import io.github.nickid2018.atribot.plugins.wiki.persist.StartWikiEntry;
 import io.github.nickid2018.atribot.plugins.wiki.persist.WikiEntry;
 import io.github.nickid2018.atribot.plugins.wiki.resolve.*;
@@ -22,12 +24,15 @@ import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @AllArgsConstructor
 public class WikiResolver implements CommunicateReceiver {
 
     private static final Set<String> KEYS = Set.of("atribot.message.command", "atribot.message.normal");
+    private static final Pattern WIKI_LINK_PATTERN = Pattern.compile("\\[\\[(.+?)]]");
 
     private final WikiPlugin plugin;
     private final InterwikiStorage interwikiStorage;
@@ -46,6 +51,29 @@ public class WikiResolver implements CommunicateReceiver {
                 default -> {
                 }
             }
+        } else {
+            MessageCommunicateData messageData = (MessageCommunicateData) data;
+            String message = TextMessage.concatText(messageData.messageChain);
+            Matcher matcher = WIKI_LINK_PATTERN.matcher(message);
+            if (matcher.find()) {
+                String get = matcher.group();
+                get = get.substring(2, get.length() - 2);
+                int splitIndex = get.indexOf('|');
+                if (splitIndex >= 0)
+                    get = get.substring(0, splitIndex);
+                String finalGet = get;
+                plugin.getExecutorService().execute(catchException(
+                    () -> requestWikiPage(
+                        new String[]{finalGet},
+                        messageData.backendID,
+                        messageData.targetData,
+                        messageData.messageManager
+                    ),
+                    messageData.backendID,
+                    messageData.targetData,
+                    messageData.messageManager
+                ));
+            }
         }
         return null;
     }
@@ -55,7 +83,7 @@ public class WikiResolver implements CommunicateReceiver {
     }
 
     private void executeWikiCommand(CommandCommunicateData data, WikiCommand command) {
-        plugin.getExecutorService().execute(noException(
+        plugin.getExecutorService().execute(catchException(
             () -> command.execute(
                 data.commandArgs,
                 data.backendID,
@@ -68,7 +96,7 @@ public class WikiResolver implements CommunicateReceiver {
         ));
     }
 
-    private Runnable noException(FunctionUtil.RunnableWithException<? extends Throwable> runnable, String backendID, TargetData targetData, MessageManager manager) {
+    private Runnable catchException(FunctionUtil.RunnableWithException<? extends Throwable> runnable, String backendID, TargetData targetData, MessageManager manager) {
         return FunctionUtil.tryOrElse(runnable, e -> {
             manager.sendMessage(
                 backendID,
