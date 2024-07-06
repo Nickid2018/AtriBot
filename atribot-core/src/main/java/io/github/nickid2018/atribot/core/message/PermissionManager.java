@@ -19,15 +19,27 @@ public class PermissionManager {
         return target != null && target.isUserSpecified() && hasPermission(target.getTargetUser(), permission);
     }
 
-    @SneakyThrows
     public boolean hasPermission(String user, PermissionLevel permission) {
+        return permission.ordinal() >= getPermissionLevel(user).ordinal();
+    }
+
+    @SneakyThrows
+    public PermissionLevel getPermissionLevel(String user) {
         PermissionEntry entry = permissionDao.queryForId(user);
-        if (entry != null && entry.timestamp < System.currentTimeMillis()) {
-            permissionDao.delete(entry);
-            entry = null;
-        }
-        PermissionLevel level = entry == null ? PermissionLevel.USER : entry.level;
-        return permission.ordinal() >= level.ordinal();
+        entry = checkExpired(entry);
+        return entry == null ? PermissionLevel.USER : entry.level;
+    }
+
+    @SneakyThrows
+    public long getPermissionTimestamp(String user) {
+        PermissionEntry entry = permissionDao.queryForId(user);
+        entry = checkExpired(entry);
+        return entry == null ? Long.MAX_VALUE : entry.timestamp;
+    }
+
+    @SneakyThrows
+    public void clearPermission(String user) {
+        permissionDao.deleteById(user);
     }
 
     @SneakyThrows
@@ -46,5 +58,19 @@ public class PermissionManager {
         entry.level = permission;
         entry.timestamp = System.currentTimeMillis() + time;
         permissionDao.createOrUpdate(entry);
+    }
+
+    @SneakyThrows
+    private PermissionEntry checkExpired(PermissionEntry entry) {
+        if (entry == null)
+            return null;
+        long time = System.currentTimeMillis();
+        if (entry.timestamp < time) {
+            entry.level = PermissionLevel.USER;
+            entry.timestamp = Long.MAX_VALUE;
+            permissionDao.delete(entry);
+            return entry;
+        }
+        return entry;
     }
 }

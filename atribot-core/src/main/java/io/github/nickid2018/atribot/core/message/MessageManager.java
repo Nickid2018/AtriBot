@@ -82,6 +82,9 @@ public class MessageManager {
     }
 
     public void handleMessage(String backendID, TargetData target, MessageChain messageChain) {
+        if (!permissionManager.hasPermission(target.getTargetUser(), PermissionLevel.SEMI_BANNED))
+            return;
+
         String textPlain = TextMessage.concatText(messageChain);
 
         Map<String, String> backendInfo = backendInformation.get(backendID);
@@ -104,6 +107,10 @@ public class MessageManager {
     }
 
     public void sendMessage(String backendID, TargetData target, MessageChain messageChain) {
+        Communication.communicate(
+            "atribot.message.pre_send",
+            new MessageCommunicateData(backendID, messageChain, target, this)
+        );
         String uniqueID = RandomStringUtils.random(32);
         long time = System.currentTimeMillis();
         SendMessagePacket packet = new SendMessagePacket(uniqueID, target, messageChain);
@@ -114,6 +121,10 @@ public class MessageManager {
             log.error("Error saving message to queue", e);
         }
         listener.sendPacket(backendID, packet);
+        Communication.communicate(
+            "atribot.message.after_send",
+            new MessageCommunicateData(backendID, messageChain, target, this)
+        );
     }
 
     public void messageSent(String uniqueID) {
