@@ -42,7 +42,14 @@ public class WikiResolver implements CommunicateReceiver {
         if (communicateKey.equals("atribot.message.command")) {
             CommandCommunicateData commandData = (CommandCommunicateData) data;
             switch (commandData.commandHead) {
-                case "wiki" -> executeWikiCommand(commandData, this::requestWikiPage);
+                case "wiki" -> {
+                    commandData.messageManager.reactionMessage(
+                        commandData.backendID,
+                        commandData.messageChain,
+                        "waiting"
+                    );
+                    executeWikiCommand(commandData, this::requestWikiPage);
+                }
                 case "wikiadd" -> executeWikiCommand(commandData, this::addWiki);
                 case "wikistart" -> executeWikiCommand(commandData, this::setStartWiki);
                 case "wikiremove" -> executeWikiCommand(commandData, this::removeWiki);
@@ -63,12 +70,19 @@ public class WikiResolver implements CommunicateReceiver {
                     get = get.substring(0, splitIndex);
                 String finalGet = get;
                 plugin.getExecutorService().execute(catchException(
-                    () -> requestWikiPage(
-                        new String[]{finalGet},
-                        messageData.backendID,
-                        messageData.targetData,
-                        messageData.messageManager
-                    ),
+                    () -> {
+                        messageData.messageManager.reactionMessage(
+                            messageData.backendID,
+                            messageData.messageChain,
+                            "waiting"
+                        );
+                        requestWikiPage(
+                            new String[]{finalGet},
+                            messageData.backendID,
+                            messageData.targetData,
+                            messageData.messageManager
+                        );
+                    },
                     messageData.backendID,
                     messageData.targetData,
                     messageData.messageManager

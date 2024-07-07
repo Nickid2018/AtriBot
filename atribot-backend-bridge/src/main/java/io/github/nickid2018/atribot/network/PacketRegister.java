@@ -24,6 +24,7 @@ public interface PacketRegister {
         register.addPacket(BackendBasicInformationPacket.class, BackendBasicInformationPacket::new, false, true);
         register.addPacket(MessagePacket.class, MessagePacket::new, false, true);
         register.addPacket(SendMessagePacket.class, SendMessagePacket::new, true, false);
+        register.addPacket(SendReactionPacket.class, SendReactionPacket::new, true, false);
         register.addPacket(MessageSentPacket.class, MessageSentPacket::new, false, true);
         register.addPacket(QueuedMessageRequestPacket.class, QueuedMessageRequestPacket::new, false, true);
         register.addPacket(StopTransactionPacket.class, StopTransactionPacket::new, true, true);

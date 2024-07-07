@@ -7,19 +7,18 @@ import io.github.nickid2018.atribot.core.message.persist.MessageQueueEntry;
 import io.github.nickid2018.atribot.network.BackendServer;
 import io.github.nickid2018.atribot.network.PacketRegister;
 import io.github.nickid2018.atribot.network.message.MessageChain;
+import io.github.nickid2018.atribot.network.message.MsgIDMessage;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.network.message.TextMessage;
 import io.github.nickid2018.atribot.network.packet.backend.SendMessagePacket;
+import io.github.nickid2018.atribot.network.packet.backend.SendReactionPacket;
 import io.github.nickid2018.atribot.util.Configuration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Getter
 @Slf4j
@@ -125,6 +124,19 @@ public class MessageManager {
             "atribot.message.after_send",
             new MessageCommunicateData(backendID, messageChain, target, this)
         );
+    }
+
+    public void reactionMessage(String backendID, MessageChain messageChain, String type) {
+        Optional<String> msgID = messageChain.getMessages().stream()
+            .filter(MsgIDMessage.class::isInstance)
+            .map(MsgIDMessage.class::cast)
+            .map(MsgIDMessage::getMsgID)
+            .findFirst();
+        if (msgID.isPresent()) {
+            String id = msgID.get();
+            SendReactionPacket packet = new SendReactionPacket(id, type);
+            listener.sendPacket(backendID, packet);
+        }
     }
 
     public void messageSent(String uniqueID) {

@@ -16,6 +16,7 @@ public interface Message extends Serializable {
             case TextMessage ignored -> "text";
             case ImageMessage ignored -> "image";
             case AtMessage ignored -> "at";
+            case MsgIDMessage ignored -> "msg_id";
             case UnsupportedMessage ignored -> "unsupported";
             default -> throw new IllegalArgumentException("Unknown message: " + message);
         };
@@ -27,6 +28,7 @@ public interface Message extends Serializable {
             case "text" -> new TextMessage();
             case "image" -> new ImageMessage();
             case "at" -> new AtMessage();
+            case "msg_id" -> new MsgIDMessage();
             case "unsupported" -> UnsupportedMessage.INSTANCE;
             default -> throw new IllegalArgumentException("Unknown message id: " + id);
         };

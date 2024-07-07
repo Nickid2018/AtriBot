@@ -151,6 +151,19 @@ public class OnebotBackendListener implements NetworkListener, Listener {
 
                 connection.sendPacket(new MessageSentPacket(message.getUniqueID()));
             }
+            case SendReactionPacket reaction -> {
+                String msgID = reaction.getMessageID();
+                String reactionType = reaction.getReaction();
+                String reactionID = parseReaction(reactionType);
+                JsonObject obj = new JsonObject();
+                obj.addProperty("message_id", msgID);
+                obj.addProperty("emoji_id", reactionID);
+                oneBotClient.getActionFactory().action(
+                    oneBotClient.getBot().getChannel(),
+                    ReactionActionPath.INSTANCE,
+                    obj
+                );
+            }
             default -> throw new IllegalStateException("Unexpected value: " + msg);
         }
     }
@@ -178,7 +191,8 @@ public class OnebotBackendListener implements NetworkListener, Listener {
             String groupId = Configuration.getStringOrElse("onebot.name", "onebot") + ".group." + event.getGroupId();
             String userId = Configuration.getStringOrElse("onebot.name", "onebot") + ".user." + event.getUserId();
             TargetData target = new TargetData(groupId, userId);
-            MessageChain messageChain = parseMessage(event.getMessage());
+            String msgID = String.valueOf(event.getMessageId());
+            MessageChain messageChain = parseMessage(event.getMessage()).next(new MsgIDMessage(msgID));
             client.sendPacket(new MessagePacket(target, messageChain));
         } catch (Exception e) {
             log.error("Error occurred in group message event {}", event.getMessage(), e);
@@ -227,6 +241,13 @@ public class OnebotBackendListener implements NetworkListener, Listener {
             }
         }));
         return messageChain;
+    }
+
+    private String parseReaction(String reactionType) {
+        return switch (reactionType) {
+            case "waiting" -> "212";
+            default -> "10060";
+        };
     }
 
     private String parseMsg(MessageChain messageChain) {
