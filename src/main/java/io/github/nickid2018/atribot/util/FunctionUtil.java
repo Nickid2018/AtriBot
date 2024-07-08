@@ -2,6 +2,7 @@ package io.github.nickid2018.atribot.util;
 
 import lombok.SneakyThrows;
 
+import java.util.concurrent.Callable;
 import java.util.function.*;
 
 public class FunctionUtil {

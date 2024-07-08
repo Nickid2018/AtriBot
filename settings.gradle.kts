@@ -18,6 +18,7 @@ includeProject("atribot-plugin-web-renderer", "atribot-plugins/atribot-plugin-we
 includeProject("atribot-plugin-calc", "atribot-plugins/atribot-plugin-calc")
 includeProject("atribot-plugin-bilibili", "atribot-plugins/atribot-plugin-bilibili")
 includeProject("atribot-plugin-permission-utils", "atribot-plugins/atribot-plugin-permission-utils")
+includeProject("atribot-plugin-qrcode", "atribot-plugins/atribot-plugin-qrcode")
 
 // Backends Here
 includeProject("atribot-backend-console") // Test Console Backend

@@ -4,6 +4,7 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import io.github.nickid2018.atribot.network.connection.Connection;
 import io.github.nickid2018.atribot.network.listener.NetworkListener;
+import io.github.nickid2018.atribot.network.message.TransactionQueue;
 import io.github.nickid2018.atribot.network.packet.Packet;
 import io.github.nickid2018.atribot.network.packet.backend.BackendBasicInformationPacket;
 import io.github.nickid2018.atribot.network.packet.backend.MessagePacket;
@@ -11,11 +12,15 @@ import io.github.nickid2018.atribot.network.packet.backend.MessageSentPacket;
 import io.github.nickid2018.atribot.network.packet.backend.QueuedMessageRequestPacket;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Slf4j
 public class MessageBackendListener implements NetworkListener {
 
     private final MessageManager manager;
     private final BiMap<Connection, String> connectionMap = HashBiMap.create();
+    private final Map<String , TransactionQueue> transactionQueueMap = new HashMap<>();
 
     public MessageBackendListener(MessageManager manager) {
         this.manager = manager;
@@ -27,6 +32,14 @@ public class MessageBackendListener implements NetworkListener {
 
     @Override
     public void receivePacket(Connection connection, Packet msg) {
+        String id = connectionMap.get(connection);
+        if (id != null) {
+            TransactionQueue queue = transactionQueueMap.get(id);
+            if (queue != null && queue.resolveTransaction(msg)) {
+                log.debug("Transaction resolved: {}", msg);
+                return;
+            }
+        }
         switch (msg) {
             case BackendBasicInformationPacket packet -> {
                 manager.backendConnected(
@@ -35,6 +48,7 @@ public class MessageBackendListener implements NetworkListener {
                     packet.getExternalInformation()
                 );
                 connectionMap.put(connection, packet.getIdentifier());
+                transactionQueueMap.put(packet.getIdentifier(), new TransactionQueue(() -> connection));
             }
             case MessagePacket packet -> manager.handleMessage(
                 connectionMap.get(connection),
@@ -42,7 +56,7 @@ public class MessageBackendListener implements NetworkListener {
                 packet.getMessageChain()
             );
             case MessageSentPacket packet -> manager.messageSent(packet.getUniqueID());
-            case QueuedMessageRequestPacket ignored -> manager.clearQueue(connectionMap.get(connection));
+            case QueuedMessageRequestPacket ignored -> manager.clearQueue(id);
             default -> throw new IllegalStateException("Unexpected value: " + msg);
         }
     }
@@ -50,8 +64,10 @@ public class MessageBackendListener implements NetworkListener {
     @Override
     public void connectionClosed(Connection connection) {
         String id = connectionMap.remove(connection);
-        if (id != null)
+        if (id != null) {
+            transactionQueueMap.remove(id).close();
             manager.backendDisconnected(id);
+        }
     }
 
     @Override
@@ -68,5 +84,9 @@ public class MessageBackendListener implements NetworkListener {
         Connection connection = connectionMap.inverse().get(backendID);
         if (connection != null)
             connection.sendPacket(packet);
+    }
+
+    public TransactionQueue getTransactionQueue(String backendID) {
+        return transactionQueueMap.get(backendID);
     }
 }

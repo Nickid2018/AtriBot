@@ -74,4 +74,8 @@ public class TransactionQueue {
         }
         return false;
     }
+
+    public void close() {
+        transactionExecutor.shutdown();
+    }
 }

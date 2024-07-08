@@ -78,20 +78,27 @@ public class OnebotBackendListener implements NetworkListener, Listener {
                 Set<String> key = packet.getImageMessageKeys();
                 Set<ImageMessage> resolved = key.stream().map(imgKey -> {
                     String file = imageCache.getIfPresent(imgKey);
-                    if (file == null)
+                    if (file == null) {
+                        log.warn("Can't find image {} from cache, outdated?", imgKey);
                         return null;
+                    }
                     String imageCacheDir = Configuration.getStringOrElse("onebot.image_cache_dir", "./image_cache");
                     File[] files = new File(imageCacheDir).listFiles();
                     if (files == null)
                         return null;
                     File findFile = Stream
                         .of(files)
-                        .sorted(Comparator.comparingLong(File::lastModified).reversed())
-                        .filter(f -> new File(f, "Ori/" + file).exists())
-                        .findFirst()
+                        .map(f -> new File(f, "Ori"))
+                        .map(File::listFiles)
+                        .filter(Objects::nonNull)
+                        .flatMap(Stream::of)
+                        .filter(f -> f.getName().equalsIgnoreCase(file))
+                        .max(Comparator.comparingLong(File::lastModified))
                         .orElse(null);
-                    if (findFile == null)
+                    if (findFile == null) {
+                        log.warn("Can't find image {} because no image found with name '{}'", imgKey, file);
                         return null;
+                    }
                     String transfer = TransferFileResolver.transferFile(
                         Configuration.getStringOrElse("outgoing.transfer_type", "file"),
                         Configuration.getStringOrElse("outgoing.transfer_arg", "./transfer=>./transfer"),

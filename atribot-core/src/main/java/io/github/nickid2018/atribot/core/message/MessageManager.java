@@ -6,10 +6,7 @@ import io.github.nickid2018.atribot.core.database.DatabaseManager;
 import io.github.nickid2018.atribot.core.message.persist.MessageQueueEntry;
 import io.github.nickid2018.atribot.network.BackendServer;
 import io.github.nickid2018.atribot.network.PacketRegister;
-import io.github.nickid2018.atribot.network.message.MessageChain;
-import io.github.nickid2018.atribot.network.message.MsgIDMessage;
-import io.github.nickid2018.atribot.network.message.TargetData;
-import io.github.nickid2018.atribot.network.message.TextMessage;
+import io.github.nickid2018.atribot.network.message.*;
 import io.github.nickid2018.atribot.network.packet.backend.SendMessagePacket;
 import io.github.nickid2018.atribot.network.packet.backend.SendReactionPacket;
 import io.github.nickid2018.atribot.util.Configuration;
@@ -137,6 +134,10 @@ public class MessageManager {
             SendReactionPacket packet = new SendReactionPacket(id, type);
             listener.sendPacket(backendID, packet);
         }
+    }
+
+    public TransactionQueue getTransactionQueue(String backendID) {
+        return listener.getTransactionQueue(backendID);
     }
 
     public void messageSent(String uniqueID) {
