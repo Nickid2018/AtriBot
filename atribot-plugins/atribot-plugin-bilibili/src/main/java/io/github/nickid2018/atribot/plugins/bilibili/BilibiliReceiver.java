@@ -3,8 +3,10 @@ package io.github.nickid2018.atribot.plugins.bilibili;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import io.github.nickid2018.atribot.core.communicate.Communicate;
+import io.github.nickid2018.atribot.core.communicate.CommunicateFilter;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
-import io.github.nickid2018.atribot.core.message.MessageCommunicateData;
+import io.github.nickid2018.atribot.core.communicate.MessageCommunicateData;
 import io.github.nickid2018.atribot.network.message.ImageMessage;
 import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TextMessage;
@@ -19,14 +21,11 @@ import java.io.BufferedReader;
 import java.io.StringReader;
 import java.net.URI;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @AllArgsConstructor
 public class BilibiliReceiver implements CommunicateReceiver {
-
-    private static final Set<String> KEY = Set.of("atribot.message.normal");
 
     public static final Pattern B_AV_VIDEO_PATTERN = Pattern.compile("[aA][vV][1-9]\\d{0,9}");
     public static final Pattern B_BV_VIDEO_PATTERN = Pattern.compile(
@@ -35,9 +34,11 @@ public class BilibiliReceiver implements CommunicateReceiver {
 
     private final BilibiliPlugin plugin;
 
-    @Override
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) throws Exception {
-        MessageCommunicateData messageData = (MessageCommunicateData) data;
+    @Communicate("command.regex")
+    @CommunicateFilter(key = "regex", value = "[aA][vV][1-9]\\d{0,9}")
+    @CommunicateFilter(key = "regex", value = "[bB][vV][fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF]{10}")
+    @CommunicateFilter(key = "regex", value = "https://b23\\.tv/[0-9a-zA-Z]+")
+    public void communicate(MessageCommunicateData messageData) {
         String message = TextMessage.concatText(messageData.messageChain);
         plugin.getExecutorService().execute(FunctionUtil.tryOrElse(() -> {
             Matcher matcher = B_SHORT_LINK_PATTERN.matcher(message);
@@ -52,7 +53,6 @@ public class BilibiliReceiver implements CommunicateReceiver {
             messageData.targetData,
             MessageChain.text("Bilibili：获取信息失败，错误报告如下\n" + e.getMessage())
         )));
-        return null;
     }
 
     @SneakyThrows
@@ -74,7 +74,6 @@ public class BilibiliReceiver implements CommunicateReceiver {
                 .fetchDataInJson(new HttpGet("https://api.bilibili.com/x/web-interface/view?bvid=" + bv))
                 .getAsJsonObject();
             getVideoInfo(bv, data, messageCommunicateData);
-            return;
         }
     }
 
@@ -173,10 +172,5 @@ public class BilibiliReceiver implements CommunicateReceiver {
         if (time < 3600)
             return time / 60 + "m" + time % 60 + "s";
         return time / 3600 + "h" + (time % 3600) / 60 + "m" + time % 60 + "s";
-    }
-
-    @Override
-    public Set<String> availableCommunicateKeys() {
-        return KEY;
     }
 }

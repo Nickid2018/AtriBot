@@ -4,6 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import io.github.nickid2018.atribot.core.communicate.Communicate;
+import io.github.nickid2018.atribot.core.communicate.CommunicateFilter;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.communicate.Communication;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
@@ -18,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
@@ -29,28 +30,22 @@ import java.util.stream.StreamSupport;
 public class WakatimeReceiver implements CommunicateReceiver {
 
     private final WakatimePlugin plugin;
-    private static final Set<String> keys = Set.of(
-        "atribot.message.command",
-        "oauth2.service.started",
-        "oauth2.service.stopped"
-    );
-
-    @Override
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) {
-        switch (communicateKey) {
-            case "oauth2.service.started" -> plugin.registerOAuth2Service();
-            case "oauth2.service.stopped" -> plugin.oauth2ServiceAvailable = false;
-            case "atribot.message.command" -> doCommand((CommandCommunicateData) data);
-        }
-        return null;
-    }
 
     public static final Pattern TIME_DURATION = Pattern.compile("\\d{8}-\\d{8}");
 
-    public void doCommand(CommandCommunicateData messageData) {
-        if (!messageData.commandHead.equals("wakatime"))
-            return;
+    @Communicate("oauth2.service.started")
+    public void onOAuth2ServiceStarted() {
+        plugin.registerOAuth2Service();
+    }
 
+    @Communicate("oauth2.service.stopped")
+    public void onOAuth2ServiceStopped() {
+        plugin.oauth2ServiceAvailable = false;
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "wakatime")
+    public void doCommand(CommandCommunicateData messageData) {
         String backendID = messageData.backendID;
         TargetData target = messageData.targetData;
         MessageManager manager = messageData.messageManager;
@@ -109,7 +104,7 @@ public class WakatimeReceiver implements CommunicateReceiver {
     }
 
     private void revoke(String backendID, MessageManager manager, TargetData target) {
-        Communication.<Map<?, ?>, Void>communicateWithResult(
+        Communication.communicateWithResult(
             "atribot-plugin-oauth2-service",
             "oauth2.revoke",
             Map.of(
@@ -128,7 +123,7 @@ public class WakatimeReceiver implements CommunicateReceiver {
 
     public void printAllSummary(String backendID, MessageManager manager, TargetData targetData) {
         Communication
-            .<Map<?, ?>, String>communicateWithResult(
+            .communicateWithResult(
                 "atribot-plugin-oauth2-service",
                 "oauth2.authenticate",
                 Map.of(
@@ -182,7 +177,7 @@ public class WakatimeReceiver implements CommunicateReceiver {
 
     public void printSummary(String url, String backendID, MessageManager manager, TargetData targetData) {
         Communication
-            .<Map<?, ?>, String>communicateWithResult(
+            .communicateWithResult(
                 "atribot-plugin-oauth2-service",
                 "oauth2.authenticate",
                 Map.of(
@@ -278,10 +273,5 @@ public class WakatimeReceiver implements CommunicateReceiver {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wakatime：授权错误：" + t.getMessage()));
         }
         return null;
-    }
-
-    @Override
-    public Set<String> availableCommunicateKeys() {
-        return keys;
     }
 }

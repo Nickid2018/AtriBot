@@ -30,7 +30,7 @@ public class AtriBotMain {
         MessageManager manager = new MessageManager();
         manager.start();
 
-        Communication.communicate("atribot.preload_class", null);
+        Communication.communicate("atribot.preload_class");
         PluginManager.loadAll();
 
         Scanner scanner = new Scanner(System.in);

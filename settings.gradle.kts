@@ -10,6 +10,7 @@ includeProject("atribot-backend-bridge") // Backend Bridge
 
 // Plugins Here
 includeProject("atribot-plugin-testing", "atribot-plugins/atribot-plugin-testing")
+includeProject("atribot-plugin-command", "atribot-plugins/atribot-plugin-command")
 includeProject("atribot-plugin-wakatime", "atribot-plugins/atribot-plugin-wakatime")
 includeProject("atribot-plugin-oauth2-service", "atribot-plugins/atribot-plugin-oauth2-service")
 includeProject("atribot-plugin-mc-ping", "atribot-plugins/atribot-plugin-mc-ping")

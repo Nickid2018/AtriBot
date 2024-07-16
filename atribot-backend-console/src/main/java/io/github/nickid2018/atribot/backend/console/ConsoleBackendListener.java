@@ -33,7 +33,7 @@ public class ConsoleBackendListener implements NetworkListener {
             Map.of(
                 "forwardMessageSupport", "false",
                 "selfId", "console",
-                "prefixCommand", ""
+                "prefixCommand", ">"
             )
         ));
         connection.sendPacket(QueuedMessageRequestPacket.INSTANCE);

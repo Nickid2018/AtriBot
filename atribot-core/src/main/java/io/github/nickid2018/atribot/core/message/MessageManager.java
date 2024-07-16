@@ -2,6 +2,7 @@ package io.github.nickid2018.atribot.core.message;
 
 import com.j256.ormlite.dao.Dao;
 import io.github.nickid2018.atribot.core.communicate.Communication;
+import io.github.nickid2018.atribot.core.communicate.MessageCommunicateData;
 import io.github.nickid2018.atribot.core.database.DatabaseManager;
 import io.github.nickid2018.atribot.core.message.persist.MessageQueueEntry;
 import io.github.nickid2018.atribot.network.BackendServer;

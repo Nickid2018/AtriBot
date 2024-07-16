@@ -1,5 +1,6 @@
 package io.github.nickid2018.atribot.plugins.webrenderer;
 
+import io.github.nickid2018.atribot.core.communicate.Communicate;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.network.file.TransferFileResolver;
 import io.github.nickid2018.atribot.util.Configuration;
@@ -15,38 +16,21 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @AllArgsConstructor
 public class WebRendererReceiver implements CommunicateReceiver {
 
-    private static final Set<String> KEY = Set.of("webrenderer.render_page_element", "webrenderer.render_html_element");
     private final WebRendererPlugin plugin;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) {
-        Map<String, Object> map = (Map<String, Object>) data;
-        switch (communicateKey) {
-            case "webrenderer.render_page_element" -> {
-                return renderElement(map);
-            }
-            case "webrenderer.render_html_element" -> {
-                return renderHtmlElement(map);
-            }
-        }
-        return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> CompletableFuture<T> renderElement(Map<String, Object> data) {
+    @Communicate("webrenderer.render_page_element")
+    public CompletableFuture<?> renderElement(Map<String, Object> data) {
         String page = (String) data.get("page");
         int timeout = (int) data.getOrDefault("timeout", 30);
         String elementSelector = (String) data.getOrDefault("element", "html");
         IntIntPair windowSize = data.containsKey("windowSize") ? (IntIntPair) data.get("windowSize") : null;
-        return (CompletableFuture<T>) CompletableFuture.supplyAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             RemoteWebDriver driver = plugin.createNewDriver();
             try {
                 if (windowSize != null)
@@ -85,7 +69,8 @@ public class WebRendererReceiver implements CommunicateReceiver {
         }, plugin.getRendererExecutor());
     }
 
-    private <T> CompletableFuture<T> renderHtmlElement(Map<String, Object> data) {
+    @Communicate("webrenderer.render_html_element")
+    public CompletableFuture<?> renderHtmlElement(Map<String, Object> data) {
         String html = (String) data.get("html");
 
         return TransferFileResolver
@@ -100,10 +85,5 @@ public class WebRendererReceiver implements CommunicateReceiver {
                 return data;
             })
             .thenCompose(this::renderElement);
-    }
-
-    @Override
-    public Set<String> availableCommunicateKeys() {
-        return KEY;
     }
 }

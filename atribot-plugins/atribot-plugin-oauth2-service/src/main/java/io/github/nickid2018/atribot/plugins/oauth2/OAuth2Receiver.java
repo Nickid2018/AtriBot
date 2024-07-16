@@ -1,6 +1,7 @@
 package io.github.nickid2018.atribot.plugins.oauth2;
 
 import com.j256.ormlite.dao.Dao;
+import io.github.nickid2018.atribot.core.communicate.Communicate;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.MessageManager;
 import io.github.nickid2018.atribot.network.message.TargetData;
@@ -13,36 +14,12 @@ import java.util.concurrent.CompletableFuture;
 @AllArgsConstructor
 public class OAuth2Receiver implements CommunicateReceiver {
 
-    private static final Set<String> communicateKeys = Set.of(
-        "oauth2.register",
-        "oauth2.unregister",
-        "oauth2.authenticate",
-        "oauth2.revoke"
-    );
-
     private final OAuth2Plugin plugin;
     private final OAuth2Server server;
     private final Map<String, OAuth2Authenticator> authenticators = new HashMap<>();
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) throws Exception {
-        return switch (communicateKey) {
-            case "oauth2.register" -> registerOAuth2((Map<String, Object>) data);
-            case "oauth2.authenticate" -> authenticate((Map<String, Object>) data);
-            case "oauth2.revoke" -> revoke((Map<String, Object>) data);
-            case "oauth2.unregister" -> {
-                String oauthName = (String) data;
-                OAuth2Authenticator authenticator = authenticators.remove(oauthName);
-                authenticator.completeWaiting();
-                server.removeHandler(authenticator.getRedirect());
-                yield null;
-            }
-            default -> null;
-        };
-    }
-
-    private <T> CompletableFuture<T> registerOAuth2(Map<String, Object> data) throws SQLException {
+    @Communicate("oauth2.register")
+    public void registerOAuth2(Map<String, Object> data) throws SQLException {
         String oauthName = (String) data.get("oauthName");
         String authenticateURL = (String) data.get("authenticateURL");
         String tokenGrantURL = (String) data.get("tokenGrantURL");
@@ -69,11 +46,18 @@ public class OAuth2Receiver implements CommunicateReceiver {
 
         server.addHandler(redirect, authenticator);
         authenticators.put(oauthName, authenticator);
-        return null;
+    }
+
+    @Communicate("oauth2.unregister")
+    public void unregisterOAuth2(String oauthName) {
+        OAuth2Authenticator authenticator = authenticators.remove(oauthName);
+        authenticator.completeWaiting();
+        server.removeHandler(authenticator.getRedirect());
     }
 
     @SuppressWarnings("unchecked")
-    public <T> CompletableFuture<T> authenticate(Map<String, Object> data) {
+    @Communicate("oauth2.authenticate")
+    public CompletableFuture<?> authenticate(Map<String, Object> data) {
         String oauthName = (String) data.get("oauthName");
         String backendID = (String) data.get("backendID");
         TargetData targetData = (TargetData) data.get("target");
@@ -91,7 +75,7 @@ public class OAuth2Receiver implements CommunicateReceiver {
         if (authenticator == null)
             return CompletableFuture.failedFuture(new IllegalArgumentException("OAuth2 not registered"));
 
-        return (CompletableFuture<T>) authenticator.authenticate(
+        return authenticator.authenticate(
             backendID,
             targetData,
             manager,
@@ -100,8 +84,8 @@ public class OAuth2Receiver implements CommunicateReceiver {
         );
     }
 
-    @SuppressWarnings("unchecked")
-    public <T> CompletableFuture<T> revoke(Map<String, Object> data) {
+    @Communicate("oauth2.revoke")
+    public CompletableFuture<?> revoke(Map<String, Object> data) {
         String oauthName = (String) data.get("oauthName");
         String id = (String) data.get("id");
 
@@ -109,12 +93,7 @@ public class OAuth2Receiver implements CommunicateReceiver {
         if (authenticator == null)
             return CompletableFuture.failedFuture(new IllegalArgumentException("OAuth2 not registered"));
 
-        return (CompletableFuture<T>) authenticator.revoke(id);
-    }
-
-    @Override
-    public Set<String> availableCommunicateKeys() {
-        return communicateKeys;
+        return authenticator.revoke(id);
     }
 
     public void onPluginUnload() {

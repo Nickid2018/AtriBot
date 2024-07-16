@@ -1,9 +1,11 @@
 package io.github.nickid2018.atribot.plugins.wiki;
 
 import com.j256.ormlite.stmt.DeleteBuilder;
+import io.github.nickid2018.atribot.core.communicate.Communicate;
+import io.github.nickid2018.atribot.core.communicate.CommunicateFilter;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
-import io.github.nickid2018.atribot.core.message.MessageCommunicateData;
+import io.github.nickid2018.atribot.core.communicate.MessageCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
 import io.github.nickid2018.atribot.core.message.PermissionLevel;
 import io.github.nickid2018.atribot.network.message.ImageMessage;
@@ -31,79 +33,105 @@ import java.util.regex.Pattern;
 @AllArgsConstructor
 public class WikiResolver implements CommunicateReceiver {
 
-    private static final Set<String> KEYS = Set.of("atribot.message.command", "atribot.message.normal");
     private static final Pattern WIKI_LINK_PATTERN = Pattern.compile("\\[\\[(.+?)]]");
 
     private final WikiPlugin plugin;
     private final InterwikiStorage interwikiStorage;
 
-    @Override
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) {
-        if (communicateKey.equals("atribot.message.command")) {
-            CommandCommunicateData commandData = (CommandCommunicateData) data;
-            switch (commandData.commandHead) {
-                case "wiki" -> {
-                    commandData.messageManager.reactionMessage(
-                        commandData.backendID,
-                        commandData.messageChain,
-                        "waiting"
-                    );
-                    executeWikiCommand(commandData, this::requestWikiPage);
-                }
-                case "wikiadd" -> executeWikiCommand(commandData, this::addWiki);
-                case "wikistart" -> executeWikiCommand(commandData, this::setStartWiki);
-                case "wikiremove" -> executeWikiCommand(commandData, this::removeWiki);
-                case "wikirender" -> executeWikiCommand(commandData, this::setWikiRendering);
-                case "wikirandom" -> executeWikiCommand(commandData, this::randomPage);
-                default -> {
-                }
-            }
-        } else {
-            MessageCommunicateData messageData = (MessageCommunicateData) data;
-            String message = TextMessage.concatText(messageData.messageChain);
-            Matcher matcher = WIKI_LINK_PATTERN.matcher(message);
-            if (matcher.find()) {
-                String get = matcher.group();
-                get = get.substring(2, get.length() - 2);
-                int splitIndex = get.indexOf('|');
-                if (splitIndex >= 0)
-                    get = get.substring(0, splitIndex);
-                String finalGet = get;
-                plugin.getExecutorService().execute(catchException(
-                    () -> {
-                        messageData.messageManager.reactionMessage(
-                            messageData.backendID,
-                            messageData.messageChain,
-                            "waiting"
-                        );
-                        requestWikiPage(
-                            new String[]{finalGet},
-                            messageData.backendID,
-                            messageData.targetData,
-                            messageData.messageManager
-                        );
-                    },
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "wikiadd")
+    @CommunicateFilter(key = "permission", value = "ADMIN")
+    public void onWikiAdd(CommandCommunicateData commandData) {
+        executeWikiCommand(commandData, this::addWiki, false);
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "wikistart")
+    @CommunicateFilter(key = "permission", value = "ADMIN")
+    public void onWikiSetStart(CommandCommunicateData commandData) {
+        executeWikiCommand(commandData, this::setStartWiki, false);
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "wikiremove")
+    @CommunicateFilter(key = "permission", value = "ADMIN")
+    public void onWikiRemove(CommandCommunicateData commandData) {
+        executeWikiCommand(commandData, this::removeWiki, false);
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "wikirender")
+    @CommunicateFilter(key = "permission", value = "ADMIN")
+    public void onWikiSetRender(CommandCommunicateData commandData) {
+        executeWikiCommand(commandData, this::setWikiRendering, false);
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "wikirandom")
+    public void onWikiRandom(CommandCommunicateData commandData) {
+        commandData.messageManager.reactionMessage(
+            commandData.backendID,
+            commandData.messageChain,
+            "waiting"
+        );
+        executeWikiCommand(commandData, this::randomPage, true);
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "wiki")
+    public void onWikiQuery(CommandCommunicateData commandData) {
+        executeWikiCommand(commandData, this::requestWikiPage, true);
+    }
+
+    @Communicate("command.regex")
+    @CommunicateFilter(key = "regex", value = "\\[\\[(.+?)]]")
+    public void onWikiInlineQuery(MessageCommunicateData messageData) {
+        String message = TextMessage.concatText(messageData.messageChain);
+        Matcher matcher = WIKI_LINK_PATTERN.matcher(message);
+        if (!matcher.find())
+            return;
+        String get = matcher.group();
+        get = get.substring(2, get.length() - 2);
+        int splitIndex = get.indexOf('|');
+        if (splitIndex >= 0)
+            get = get.substring(0, splitIndex);
+        String finalGet = get;
+        plugin.getExecutorService().execute(catchException(
+            () -> {
+                messageData.messageManager.reactionMessage(
+                    messageData.backendID,
+                    messageData.messageChain,
+                    "waiting"
+                );
+                requestWikiPage(
+                    new String[]{finalGet},
                     messageData.backendID,
                     messageData.targetData,
                     messageData.messageManager
-                ));
-            }
-        }
-        return null;
+                );
+            },
+            messageData.backendID,
+            messageData.targetData,
+            messageData.messageManager
+        ));
     }
 
     private interface WikiCommand {
         void execute(String[] args, String backendID, TargetData targetData, MessageManager manager);
     }
 
-    private void executeWikiCommand(CommandCommunicateData data, WikiCommand command) {
+    private void executeWikiCommand(CommandCommunicateData data, WikiCommand command, boolean waiting) {
         plugin.getExecutorService().execute(catchException(
-            () -> command.execute(
-                data.commandArgs,
-                data.backendID,
-                data.targetData,
-                data.messageManager
-            ),
+            () -> {
+                if (waiting)
+                    data.messageManager.reactionMessage(data.backendID, data.messageChain, "waiting");
+                command.execute(
+                    data.commandArgs,
+                    data.backendID,
+                    data.targetData,
+                    data.messageManager
+                );
+            },
             data.backendID,
             data.targetData,
             data.messageManager
@@ -123,11 +151,6 @@ public class WikiResolver implements CommunicateReceiver {
 
     @SneakyThrows
     private void addWiki(String[] args, String backendID, TargetData targetData, MessageManager manager) {
-        if (!manager.getPermissionManager().checkTargetData(targetData, PermissionLevel.ADMIN)) {
-            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：权限不足"));
-            return;
-        }
-
         if (args.length < 2) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称或 URL"));
             return;
@@ -152,11 +175,6 @@ public class WikiResolver implements CommunicateReceiver {
 
     @SneakyThrows
     private void setStartWiki(String[] args, String backendID, TargetData targetData, MessageManager manager) {
-        if (!manager.getPermissionManager().checkTargetData(targetData, PermissionLevel.ADMIN)) {
-            manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：权限不足"));
-            return;
-        }
-
         if (args.length < 1) {
             manager.sendMessage(backendID, targetData, MessageChain.text("Wiki：未指定 Wiki 名称"));
             return;
@@ -617,10 +635,5 @@ public class WikiResolver implements CommunicateReceiver {
                 }
                 return null;
             }, plugin.getExecutorService());
-    }
-
-    @Override
-    public Set<String> availableCommunicateKeys() {
-        return KEYS;
     }
 }

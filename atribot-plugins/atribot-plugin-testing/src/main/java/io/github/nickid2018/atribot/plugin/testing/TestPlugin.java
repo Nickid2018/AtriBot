@@ -22,7 +22,8 @@ public class TestPlugin implements AtriBotPlugin {
 
     @Override
     public CommunicateReceiver getCommunicateReceiver() {
-        return CommunicateReceiver.NOP;
+        return new CommunicateReceiver() {
+        };
     }
 
     @Override

@@ -1,5 +1,7 @@
 package io.github.nickid2018.atribot.plugins.permission;
 
+import io.github.nickid2018.atribot.core.communicate.Communicate;
+import io.github.nickid2018.atribot.core.communicate.CommunicateFilter;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.core.message.MessageManager;
@@ -12,7 +14,6 @@ import io.github.nickid2018.atribot.util.FunctionUtil;
 import lombok.AllArgsConstructor;
 
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -20,72 +21,92 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class PermissionReceiver implements CommunicateReceiver {
 
-    public static final Set<String> KEYS = Set.of("atribot.message.command");
-
     private PermissionPlugin plugin;
 
-    @Override
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) throws Exception {
-        CommandCommunicateData commandData = (CommandCommunicateData) data;
-        PermissionManager manager = commandData.messageManager.getPermissionManager();
-        if (manager.checkTargetData(commandData.targetData, PermissionLevel.ADMIN)) {
-            String[] ids = commandData.messageChain
-                .getMessages()
-                .stream()
-                .filter(AtMessage.class::isInstance)
-                .map(AtMessage.class::cast)
-                .map(AtMessage::getTargetData)
-                .filter(TargetData::isUserSpecified)
-                .map(TargetData::getTargetUser)
-                .collect(Collectors.toSet())
-                .toArray(String[]::new);
-            if (ids.length == 0)
-                return null;
-            String arg = commandData.commandArgs.length > 0 ? commandData.commandArgs[0] : null;
+    private String[] getIDs(MessageChain chain) {
+        return chain
+            .getMessages()
+            .stream()
+            .filter(AtMessage.class::isInstance)
+            .map(AtMessage.class::cast)
+            .map(AtMessage::getTargetData)
+            .filter(TargetData::isUserSpecified)
+            .map(TargetData::getTargetUser)
+            .collect(Collectors.toSet())
+            .toArray(String[]::new);
+    }
 
-            switch (commandData.commandHead) {
-                case "admin", "mod" -> {
-                    if (manager.checkTargetData(commandData.targetData, PermissionLevel.SUPER_USER))
-                        doPermissionState(
-                            ids,
-                            arg,
-                            commandData.backendID,
-                            commandData.messageManager,
-                            commandData.targetData,
-                            manager,
-                            PermissionLevel.ADMIN
-                        );
-                }
-                case "semiban" -> doPermissionState(
-                    ids,
-                    arg,
-                    commandData.backendID,
-                    commandData.messageManager,
-                    commandData.targetData,
-                    manager,
-                    PermissionLevel.SEMI_BANNED
-                );
-                case "ban" -> doPermissionState(
-                    ids,
-                    arg,
-                    commandData.backendID,
-                    commandData.messageManager,
-                    commandData.targetData,
-                    manager,
-                    PermissionLevel.BANNED
-                );
-                case "beuser" -> runAndCatch(() -> {
-                    for (String id : ids)
-                        manager.clearPermission(id);
-                    commandData.messageManager.sendMessage(
-                        commandData.backendID,
-                        commandData.targetData,
-                        MessageChain.text("Permission-Utils：权限设置成功！")
-                    );
-                }, commandData.backendID, commandData.messageManager, commandData.targetData);
-            }
-        }
-        return null;
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "permission", value = "SUPER_USER")
+    @CommunicateFilter(key = "name", value = "admin")
+    @CommunicateFilter(key = "name", value = "mod")
+    public void doAdmin(CommandCommunicateData commandData) {
+        String[] ids = getIDs(commandData.messageChain);
+        if (ids.length == 0)
+            return;
+        doPermissionState(
+            ids,
+            commandData.commandArgs.length > 0 ? commandData.commandArgs[0] : null,
+            commandData.backendID,
+            commandData.messageManager,
+            commandData.targetData,
+            commandData.messageManager.getPermissionManager(),
+            PermissionLevel.ADMIN
+        );
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "permission", value = "ADMIN")
+    @CommunicateFilter(key = "name", value = "semiban")
+    public void doSemiBan(CommandCommunicateData commandData) {
+        String[] ids = getIDs(commandData.messageChain);
+        if (ids.length == 0)
+            return;
+        doPermissionState(
+            ids,
+            commandData.commandArgs.length > 0 ? commandData.commandArgs[0] : null,
+            commandData.backendID,
+            commandData.messageManager,
+            commandData.targetData,
+            commandData.messageManager.getPermissionManager(),
+            PermissionLevel.SEMI_BANNED
+        );
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "permission", value = "ADMIN")
+    @CommunicateFilter(key = "name", value = "ban")
+    public void doBan(CommandCommunicateData commandData) {
+        String[] ids = getIDs(commandData.messageChain);
+        if (ids.length == 0)
+            return;
+        doPermissionState(
+            ids,
+            commandData.commandArgs.length > 0 ? commandData.commandArgs[0] : null,
+            commandData.backendID,
+            commandData.messageManager,
+            commandData.targetData,
+            commandData.messageManager.getPermissionManager(),
+            PermissionLevel.BANNED
+        );
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "permission", value = "ADMIN")
+    @CommunicateFilter(key = "name", value = "beuser")
+    public void doUser(CommandCommunicateData commandData) {
+        String[] ids = getIDs(commandData.messageChain);
+        if (ids.length == 0)
+            return;
+        runAndCatch(() -> {
+            for (String id : ids)
+                commandData.messageManager.getPermissionManager().clearPermission(id);
+            commandData.messageManager.sendMessage(
+                commandData.backendID,
+                commandData.targetData,
+                MessageChain.text("Permission-Utils：权限设置成功！")
+            );
+        }, commandData.backendID, commandData.messageManager, commandData.targetData);
     }
 
     private static final Pattern TIME_PATTERN = Pattern.compile("\\d+[smhdy]");
@@ -168,10 +189,5 @@ public class PermissionReceiver implements CommunicateReceiver {
                 );
             }
         });
-    }
-
-    @Override
-    public Set<String> availableCommunicateKeys() {
-        return KEYS;
     }
 }

@@ -7,6 +7,8 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeReader;
 import com.google.zxing.qrcode.QRCodeWriter;
+import io.github.nickid2018.atribot.core.communicate.Communicate;
+import io.github.nickid2018.atribot.core.communicate.CommunicateFilter;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
 import io.github.nickid2018.atribot.core.message.CommandCommunicateData;
 import io.github.nickid2018.atribot.network.message.ImageMessage;
@@ -29,24 +31,11 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class QRCodeReceiver implements CommunicateReceiver {
 
-    public static final Set<String> KEYS = Set.of(
-        "atribot.message.command"
-    );
-
     private final QRCodePlugin plugin;
 
-    @Override
-    public <T, D> CompletableFuture<T> communicate(String communicateKey, D data) throws Exception {
-        CommandCommunicateData commandData = (CommandCommunicateData) data;
-        String command = commandData.commandHead;
-        if (command.equals("qr-encode"))
-            doEncode(commandData);
-        else if (command.equals("qr-decode"))
-            doDecode(commandData);
-        return null;
-    }
-
-    private void doEncode(CommandCommunicateData commandData) {
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "qr-encode")
+    public void doEncode(CommandCommunicateData commandData) {
         String toEncode = String.join(" ", commandData.commandArgs);
         CompletableFuture.supplyAsync(FunctionUtil.sneakyThrowsSupplier(() -> {
             QRCodeWriter writer = new QRCodeWriter();
@@ -81,7 +70,9 @@ public class QRCodeReceiver implements CommunicateReceiver {
         });
     }
 
-    private void doDecode(CommandCommunicateData commandData) {
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "qr-decode")
+    public void doDecode(CommandCommunicateData commandData) {
         MessageChain chain = commandData.messageChain;
         ImageMessage imageMessage = chain
             .getMessages()
@@ -160,10 +151,5 @@ public class QRCodeReceiver implements CommunicateReceiver {
             );
             return null;
         });
-    }
-
-    @Override
-    public Set<String> availableCommunicateKeys() {
-        return KEYS;
     }
 }
