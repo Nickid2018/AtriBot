@@ -59,7 +59,10 @@ public class InterwikiStorage {
                 url -> info.thenApplyAsync(
                     FunctionUtil.tryUntil(this::getInterwikis, 5),
                     plugin.getExecutorService()
-                )
+                ).exceptionally(FunctionUtil.sneakyThrowsFunc(t -> {
+                    availableInterwikis.remove(startWikiURL);
+                    throw t;
+                }))
             );
             return info;
         }
