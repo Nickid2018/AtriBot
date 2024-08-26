@@ -78,12 +78,13 @@ public class BugTrackerPlugin extends AbstractAtriBotPlugin implements Communica
             "waiting"
         ));
         while (matcher.find()) {
+            String match = matcher.group();
             CompletableFuture
                 .runAsync(() -> analyzeBug(
                     messageCommunicateData.messageManager,
                     messageCommunicateData.targetData,
                     messageCommunicateData.backendID,
-                    matcher.group()
+                    match
                 ), getExecutorService())
                 .exceptionally(t -> {
                     messageCommunicateData.messageManager.sendMessage(
@@ -190,7 +191,7 @@ public class BugTrackerPlugin extends AbstractAtriBotPlugin implements Communica
             "webrenderer.render_page_element",
             Map.of(
                 "page", "https://bugs.mojang.com/browse/" + searchBug,
-                "element", ".aui-item.issue-main-column"
+                "element", "#descriptionmodule"
             )
         ).thenComposeAsync(image -> {
              if (image == null)
