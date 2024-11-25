@@ -7,7 +7,7 @@ repositories {
 
 dependencies {
    api(project(":atribot-backend-bridge"))
-   implementation("cn.evole.onebot:OneBot-Client:0.4.0")
+   implementation("cn.evole.onebot:OneBot-Client:0.4.1")
 }
 
 tasks.jar {

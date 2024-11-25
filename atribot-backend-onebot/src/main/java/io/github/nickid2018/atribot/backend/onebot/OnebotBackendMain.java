@@ -34,10 +34,8 @@ public class OnebotBackendMain {
             () -> new IllegalArgumentException("Please set onebot.url in configuration file!")
         ));
         boolean accessToken = Configuration.hasKey("onebot.access_token");
-        if (accessToken) {
-            config.setAccessToken(true);
+        if (accessToken)
             config.setToken(Configuration.getString("onebot.access_token"));
-        }
 
         OneBotClient client = OneBotClient.create(config).open();
         OnebotBackendListener listener = new OnebotBackendListener(client);

@@ -306,7 +306,7 @@ public class WikiInfo {
                                             .toList()
                                         : Collections.emptyList();
             boolean hasDocumentation = useTemplates.contains("Template:Documentation");
-            boolean isScribunto = page.get("contentmodel").getAsString().equals("Scribunto");
+            boolean isScribunto = page.has("contentmodel") && page.get("contentmodel").getAsString().equals("Scribunto");
 
             if (hasDocumentation || isScribunto)
                 section = null;

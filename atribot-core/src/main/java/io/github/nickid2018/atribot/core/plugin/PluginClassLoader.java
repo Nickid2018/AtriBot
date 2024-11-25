@@ -12,12 +12,15 @@ import java.util.function.Consumer;
 @Slf4j
 public class PluginClassLoader extends URLClassLoader {
 
+    static {
+        ClassLoader.registerAsParallelCapable();
+    }
+
     public PluginClassLoader(File jarFile, Consumer<String> debugService, Consumer<String> loggerService, Consumer<String> errorService) throws IOException {
         super(
             ClassPathDependencyResolver.resolveDependencies(jarFile, debugService, loggerService, errorService),
             Thread.currentThread().getContextClassLoader()
         );
-        ClassLoader.registerAsParallelCapable();
     }
 
     @SneakyThrows

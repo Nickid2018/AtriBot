@@ -32,12 +32,12 @@ public class InterwikiStorage {
 
     public void addWiki(String baseURL) {
         CompletableFuture<WikiInfo> info = CompletableFuture.supplyAsync(
-            FunctionUtil.tryUntil(() -> new WikiInfo(baseURL), 5),
+            FunctionUtil.sneakyThrowsSupplier(FunctionUtil.tryUntil(() -> new WikiInfo(baseURL), 5)),
             plugin.getExecutorService()
         );
         interwikisMap.put(baseURL, info);
         availableInterwikis.put(baseURL, info.thenApplyAsync(
-            FunctionUtil.tryUntil(this::getInterwikis, 5),
+            FunctionUtil.sneakyThrowsFunc(FunctionUtil.tryUntil(this::getInterwikis, 5)),
             plugin.getExecutorService()
         ));
     }
@@ -50,14 +50,14 @@ public class InterwikiStorage {
             CompletableFuture<WikiInfo> info = interwikisMap.computeIfAbsent(
                 startWikiURL,
                 url -> CompletableFuture.supplyAsync(
-                    FunctionUtil.tryUntil(() -> new WikiInfo(url), 5),
+                    FunctionUtil.sneakyThrowsSupplier(FunctionUtil.tryUntil(() -> new WikiInfo(url), 5)),
                     plugin.getExecutorService()
                 )
             );
             availableInterwikis.computeIfAbsent(
                 startWikiURL,
                 url -> info.thenApplyAsync(
-                    FunctionUtil.tryUntil(this::getInterwikis, 5),
+                    FunctionUtil.sneakyThrowsFunc(FunctionUtil.tryUntil(this::getInterwikis, 5)),
                     plugin.getExecutorService()
                 ).exceptionally(FunctionUtil.sneakyThrowsFunc(t -> {
                     availableInterwikis.remove(startWikiURL);

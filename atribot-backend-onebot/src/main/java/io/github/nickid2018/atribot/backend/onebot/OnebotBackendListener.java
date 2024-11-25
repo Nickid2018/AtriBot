@@ -66,7 +66,7 @@ public class OnebotBackendListener implements NetworkListener, Listener {
         BotConfig config = oneBotClient.getConfig();
         log.info("Bot ID: {}", config.getBotId());
         log.info("Bot URL: {}", config.getUrl());
-        if (config.isAccessToken())
+        if (config.getToken() != null)
             log.info("Bot Access Token: {}", "*".repeat(config.getToken().length()));
     }
 
