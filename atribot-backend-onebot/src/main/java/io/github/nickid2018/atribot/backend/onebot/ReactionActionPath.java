@@ -1,6 +1,6 @@
 package io.github.nickid2018.atribot.backend.onebot;
 
-import cn.evole.onebot.sdk.action.ActionPath;
+import cn.evole.onebot.sdk.action.misc.ActionPath;
 
 public class ReactionActionPath implements ActionPath {
 

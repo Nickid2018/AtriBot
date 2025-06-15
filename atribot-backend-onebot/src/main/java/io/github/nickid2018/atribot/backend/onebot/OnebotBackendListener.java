@@ -262,7 +262,13 @@ public class OnebotBackendListener implements NetworkListener, Listener {
         messageChain.getMessages().forEach(FunctionUtil.sneakyThrowsConsumer(message -> {
             switch (message) {
                 case TextMessage textMessage -> builder.text(textMessage.getText());
-                case ImageMessage imageMessage -> builder.img(imageMessage.getResolved().toURL().toString());
+                case ImageMessage imageMessage -> builder.img(
+                    imageMessage
+                        .getResolved()
+                        .toURL()
+                        .toString()
+                        .replace("file:", "file://")
+                );
                 case AtMessage atMessage -> {
                     TargetData target = atMessage.getTargetData();
                     if (!target.isUserSpecified())
