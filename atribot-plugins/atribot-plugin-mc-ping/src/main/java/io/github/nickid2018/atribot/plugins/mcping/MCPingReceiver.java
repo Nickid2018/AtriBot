@@ -4,7 +4,6 @@ import com.google.common.net.HostAndPort;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.nickid2018.atribot.core.communicate.Communicate;
 import io.github.nickid2018.atribot.core.communicate.CommunicateFilter;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
@@ -22,10 +21,10 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Slf4j
 @AllArgsConstructor
@@ -35,7 +34,17 @@ public class MCPingReceiver implements CommunicateReceiver {
 
     @Communicate("command.normal")
     @CommunicateFilter(key = "name", value = "mc")
-    public void communicate(CommandCommunicateData commandData) {
+    public void communicateMC(CommandCommunicateData commandData) {
+        communicateBase(commandData, false);
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "mct")
+    public void communicateMCT(CommandCommunicateData commandData) {
+        communicateBase(commandData, true);
+    }
+
+    public void communicateBase(CommandCommunicateData commandData, boolean isText) {
         TargetData targetData = commandData.targetData;
         MessageManager manager = commandData.messageManager;
         String backend = commandData.backendID;
@@ -49,50 +58,26 @@ public class MCPingReceiver implements CommunicateReceiver {
             String addr = args[0];
 
             HostAndPort hostAndPort = HostAndPort.fromString(addr).withDefaultPort(25565);
-            InetSocketAddress srv = AddressResolver.resolveSRV(hostAndPort);
-            InetSocketAddress address = srv != null ? srv : new InetSocketAddress(
-                hostAndPort.getHost(),
-                hostAndPort.getPort()
-            );
-
-            if (address.getAddress() == null) {
-                manager.sendMessage(
-                    backend,
-                    targetData,
-                    MessageChain.text("MCPing：无法解析地址 %s".formatted(addr))
-                );
-                return;
-            }
-
-            if (address.getAddress().isLoopbackAddress()) {
-                manager.sendMessage(
-                    backend,
-                    targetData,
-                    MessageChain.text("MCPing：由于安全设置，不能访问环回地址的MC服务器")
-                );
-                return;
-            }
 
             try {
                 try {
-                    JsonObject json = new MCJEServerPing(address).fetchData();
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("html", prepareRenderingTemplate(json));
-                    data.put("element", "#base");
-                    Communication
-                        .<byte[]>communicateWithResult(
+                    JsonObject json = new MCJEServerPing(hostAndPort).fetchData();
+                    if (isText) {
+                        sendJEPlain(addr, json, manager, backend, targetData);
+                    } else {
+                        Map<String, Object> data = new HashMap<>();
+                        data.put("html", prepareRenderingTemplate(json));
+                        data.put("element", "#base");
+                        Communication.<byte[]>communicateWithResult(
                             "atribot-plugin-web-renderer",
                             "webrenderer.render_html_element",
                             data
-                        )
-                        .thenComposeAsync(
-                            result -> manager.getFileTransfer().sendFile(
-                                backend,
-                                new ByteArrayInputStream(result),
-                                plugin.getExecutorService()
-                            ), plugin.getExecutorService()
-                        )
-                        .thenAccept(fileID -> {
+                        ).thenComposeAsync(
+                            result -> manager
+                                .getFileTransfer()
+                                .sendFile(backend, new ByteArrayInputStream(result), plugin.getExecutorService()),
+                            plugin.getExecutorService()
+                        ).thenAccept(fileID -> {
                             if (fileID == null)
                                 return;
                             manager.sendMessage(
@@ -100,16 +85,16 @@ public class MCPingReceiver implements CommunicateReceiver {
                                 targetData,
                                 new MessageChain().next(new ImageMessage("", URI.create(fileID)))
                             );
-                        })
-                        .exceptionallyAsync(
+                        }).exceptionallyAsync(
                             FunctionUtil.sneakyThrowsFunc(e -> {
                                 sendJEPlain(addr, json, manager, backend, targetData);
                                 log.error("Failed to render HTML element for MCPing", e);
                                 return null;
                             }), plugin.getExecutorService()
                         ).join();
+                    }
                 } catch (IOException e) {
-                    sendBE(addr, address, manager, backend, targetData);
+                    sendBE(addr, HostAndPort.fromString(addr).withDefaultPort(19132), manager, backend, targetData);
                 }
             } catch (Exception e) {
                 manager.sendMessage(
@@ -121,12 +106,19 @@ public class MCPingReceiver implements CommunicateReceiver {
         });
     }
 
+    private String escapeHtml(String str) {
+        return str.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace(
+            "'",
+            "&#39;"
+        ).replace(" ", "&nbsp;").replace("\n", "<br/>");
+    }
+
     private String parseLiteral(String literal) {
         StringBuilder result = new StringBuilder();
         int depth = 0;
         while (literal.indexOf('§') >= 0) {
             int index = literal.indexOf('§');
-            result.append(literal, 0, index);
+            result.append(escapeHtml(literal.substring(0, index)));
             char c = literal.charAt(index + 1);
             literal = literal.substring(index + 2);
             if (c == 'r') {
@@ -159,9 +151,9 @@ public class MCPingReceiver implements CommunicateReceiver {
                 depth++;
             }
         }
-        result.append(literal);
+        result.append(escapeHtml(literal));
         result.repeat("</span>", depth);
-        return result.toString().replace("\n", "<br>");
+        return result.toString();
     }
 
     private String parseTextComponent(JsonObject component) {
@@ -181,9 +173,7 @@ public class MCPingReceiver implements CommunicateReceiver {
             if (shadowColor.isJsonPrimitive())
                 colorStr = String.format("#%06X", shadowColor.getAsInt() & 0xFFFFFF);
             else {
-                int[] rgba = shadowColor.getAsJsonArray().asList().stream()
-                                        .mapToInt(JsonElement::getAsInt)
-                                        .toArray();
+                int[] rgba = shadowColor.getAsJsonArray().asList().stream().mapToInt(JsonElement::getAsInt).toArray();
                 colorStr = String.format("#%02X%02X%02X", rgba[0], rgba[1], rgba[2]);
             }
             styleBuilder.append("--shadow-color: ").append(colorStr).append(";");
@@ -198,9 +188,13 @@ public class MCPingReceiver implements CommunicateReceiver {
             classList.add("underlined");
         if (component.has("obfuscated") && component.get("obfuscated").getAsBoolean())
             classList.add("obfuscated");
-        result.append("<span class=\"").append(String.join(" ", classList))
-              .append("\" style=\"").append(styleBuilder).append("\">")
-              .append(component.has("text") ? component.get("text").getAsString() : "[PARSING FAILED]");
+        result
+            .append("<span class=\"")
+            .append(String.join(" ", classList))
+            .append("\" style=\"")
+            .append(styleBuilder)
+            .append("\">")
+            .append(component.has("text") ? escapeHtml(component.get("text").getAsString()) : "[PARSING FAILED]");
         if (component.has("extra")) {
             JsonArray extra = component.getAsJsonArray("extra");
             for (JsonElement element : extra) {
@@ -215,6 +209,59 @@ public class MCPingReceiver implements CommunicateReceiver {
         return result.toString();
     }
 
+    private String prepareOnlinePlayers(JsonObject json) {
+        JsonArray players = JsonUtil.getDataInPath(json, "players.sample", JsonArray.class).orElse(null);
+        if (players == null || players.isEmpty())
+            return "";
+        List<String> playerData = new ArrayList<>();
+        for (JsonElement element : players) {
+            JsonObject player = element.getAsJsonObject();
+            String name = JsonUtil.getStringOrNull(player, "name");
+            String uuid = JsonUtil.getStringOrElse(player, "id", "").replace("-", "");
+            if (name != null) {
+                playerData.add(STR."""
+                                   <div style="display: flex; gap: 4px; align-items: center;">
+                                     <img src="https://crafatar.com/avatars/\{uuid}?size=16" width="16px" height="16px" />
+                                     <span>\{name}</span>
+                                   </div>
+                                   """);
+            }
+        }
+        return STR."""
+                   <div>
+                     <div style="text-align: center; margin-bottom: 2px; background-color: grey;">玩家列表</div>
+                     <div style="display: grid; grid-gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+                       \{String.join("", playerData)}
+                     </div>
+                   </div>
+                   """;
+    }
+
+    private String prepareOtherInfos(JsonObject json) {
+        String desc = json
+            .entrySet()
+            .stream()
+            .filter(entry -> !Constants.KNOWN_PROPERTIES.contains(entry.getKey()))
+            .map(entry -> {
+                String key = entry.getKey();
+                String data = Constants.KNOWN_EXTENSIONS.containsKey(key)
+                              ? Constants.KNOWN_EXTENSIONS.get(key).apply(entry.getValue())
+                              : "";
+                return data.isEmpty()
+                       ? STR."<span class=\"italic\" style=\"color: grey;\">\{key}</span>"
+                       : STR."<div>\{data}<span class=\"italic\" style=\"color: grey;\">(\{key})</span></div>";
+            })
+            .collect(Collectors.joining());
+        return desc.isEmpty()
+               ? ""
+               : STR."""
+                     <div>
+                       <div style="text-align: center; margin-bottom: 2px; background-color: grey;">其他数据</div>
+                       <div style="display: flex; gap: 2px; flex-direction: column;">\{desc}</div>
+                     </div>
+                     """;
+    }
+
     private String prepareRenderingTemplate(JsonObject json) {
         String favicon = JsonUtil.getStringInPathOrElse(json, "favicon", Constants.UNKNOWN_SERVER_FAVICON);
         int onlinePlayers = JsonUtil.getIntInPathOrZero(json, "players.online");
@@ -224,9 +271,11 @@ public class MCPingReceiver implements CommunicateReceiver {
         int ping = JsonUtil.getIntOrZero(json, "ping");
         int index = ping < 150 ? 5 : ping < 300 ? 4 : ping < 600 ? 3 : ping < 1000 ? 2 : 1;
         JsonObject descriptionJson = JsonUtil.getDataInPath(json, "description", JsonObject.class).orElse(null);
-        String motd = descriptionJson == null
-                      ? parseLiteral(JsonUtil.getStringOrElse(json, "description", ""))
-                      : parseTextComponent(descriptionJson);
+        String motd = descriptionJson == null ? parseLiteral(JsonUtil.getStringOrElse(
+            json,
+            "description",
+            ""
+        )) : parseTextComponent(descriptionJson);
         return STR."""
                <!DOCTYPE html>
                <head>
@@ -257,15 +306,16 @@ public class MCPingReceiver implements CommunicateReceiver {
                    .strike { text-decoration: line-through; }
                    .italic { font-style: italic; }
                    .obfuscated { background-color: #ffaa00; }
+                   span:last-child::after { padding-left: 1px; content: ' '; }
                  </style>
                </head>
                <html style="font-family: Minecraft, Unifont; background-color: #8e8e8e; color: white; image-rendering: pixelated; text-shadow: .125em .125em 0 var(--shadow-color)">
-                 <div id=base style="width: fit-content; height: fit-content; min-width: 200px; display: flex; flex-direction: column; padding: 5px">
+                 <div id="base" style="width: fit-content; height: fit-content; min-width: 200px; display: flex; flex-direction: column; padding: 5px; gap: 5px;">
                    <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 10px;">
                      <img src="\{favicon}" />
                      <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
                        <span>Java 版服务器</span>
-                       <div style="line-height: 22px; height: 42px; overflow-y: hidden;">\{motd}</div>
+                       <div class="gray" style="line-height: 22px; height: 42px; overflow-y: hidden;">\{motd}</div>
                      </div>
                      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
                        <div style="display: flex; gap: 5px; align-items:center;">
@@ -276,8 +326,8 @@ public class MCPingReceiver implements CommunicateReceiver {
                        <div>\{version} (\{protocol})</div>
                      </div>
                    </div>
-                   <div>
-                   </div>
+                   \{prepareOnlinePlayers(json)}
+                   \{prepareOtherInfos(json)}
                  </div>
                </html>
                """;
@@ -289,15 +339,14 @@ public class MCPingReceiver implements CommunicateReceiver {
         sb.append("服务器（Java版）：").append(addr).append("\n");
         sb.append("延迟：").append(JsonUtil.getIntOrZero(json, "ping")).append("ms\n");
         sb.append("版本：").append(JsonUtil.getStringInPathOrNull(json, "version.name"));
-        sb.append("（协议版本 ")
-          .append(JsonUtil.getIntInPathOrElse(json, "version.protocol", -1))
-          .append("）\n");
+        sb.append("（协议版本 ").append(JsonUtil.getIntInPathOrElse(json, "version.protocol", -1)).append("）\n");
 
         int onlinePlayers = JsonUtil.getIntInPathOrZero(json, "players.online");
-        sb.append("玩家数量：")
-          .append(onlinePlayers)
-          .append("/")
-          .append(JsonUtil.getIntInPathOrElse(json, "players.max", -1)).append("\n");
+        sb.append("玩家数量：").append(onlinePlayers).append("/").append(JsonUtil.getIntInPathOrElse(
+            json,
+            "players.max",
+            -1
+        )).append("\n");
 
         JsonUtil.getDataInPath(json, "players.sample", JsonArray.class).ifPresent(array -> {
             sb.append("目前玩家：");
@@ -311,8 +360,7 @@ public class MCPingReceiver implements CommunicateReceiver {
             sb.append(String.join("，", players)).append("\n");
         });
 
-        sb.append(JsonUtil.getStringInPathOrElse(
-            json, "description", "").replaceAll("§.", ""));
+        sb.append(JsonUtil.getStringInPathOrElse(json, "description", "").replaceAll("§.", ""));
         MessageChain chain = MessageChain.text(sb.toString().trim());
 
         Optional<String> favicon = JsonUtil.getString(json, "favicon");
@@ -333,23 +381,21 @@ public class MCPingReceiver implements CommunicateReceiver {
         manager.sendMessage(backend, targetData, chain);
     }
 
-    private void sendBE(String addr, InetSocketAddress address, MessageManager manager, String backend, TargetData targetData) throws IOException {
+    private void sendBE(String addr, HostAndPort address, MessageManager manager, String backend, TargetData targetData) throws IOException {
         Map<String, String> mapData = new MCBEServerPing(address).fetchData();
         StringBuilder sb = new StringBuilder();
 
         sb.append("服务器（基岩版）：").append(addr).append("\n");
         sb.append("延迟：").append(mapData.get("ping")).append("ms\n");
         sb.append("类型：").append(mapData.get("edition")).append("\n");
-        sb.append("版本：")
-          .append(mapData.get("version"))
-          .append("（协议版本 ")
-          .append(mapData.get("protocol"))
-          .append("）\n");
-        sb.append("玩家数量：")
-          .append(mapData.get("players"))
-          .append("/")
-          .append(mapData.get("maxPlayers"))
-          .append("\n");
+        sb.append("版本：").append(mapData.get("version")).append("（协议版本 ").append(mapData.get("protocol")).append(
+            "）\n");
+        sb
+            .append("玩家数量：")
+            .append(mapData.get("players"))
+            .append("/")
+            .append(mapData.get("maxPlayers"))
+            .append("\n");
         sb.append("游戏模式：").append(mapData.get("gamemode")).append("\n");
         sb.append(mapData.get("motd1")).append("\n").append(mapData.get("motd2"));
 

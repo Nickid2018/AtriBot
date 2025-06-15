@@ -1,5 +1,7 @@
 package io.github.nickid2018.atribot.plugins.mcping;
 
+import com.google.common.net.HostAndPort;
+
 import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -10,7 +12,7 @@ import java.util.Map;
 /*
  * Packet Protocol: https://wiki.vg/Raknet_Protocol
  */
-public record MCBEServerPing(InetSocketAddress address) {
+public record MCBEServerPing(HostAndPort address) {
 
     public static final long MAGIC_HIGH = 0x00ffff00fefefefeL;
     public static final long MAGIC_LOW = 0xfdfdfdfd12345678L;
@@ -29,7 +31,11 @@ public record MCBEServerPing(InetSocketAddress address) {
         dataPayload.writeLong(MAGIC_LOW); // Magic Number low bits
         dataPayload.writeLong(0L); // Client GUID, 0
 
-        DatagramPacket dp = new DatagramPacket(payloadStream.toByteArray(), payloadStream.size(), address);
+        DatagramPacket dp = new DatagramPacket(
+            payloadStream.toByteArray(),
+            payloadStream.size(),
+            new InetSocketAddress(address.getHost(), address.getPort())
+        );
         socket.send(dp);
 
         byte[] receive = new byte[2048];
@@ -44,19 +50,19 @@ public record MCBEServerPing(InetSocketAddress address) {
         if (packetID != 0x1c)
             throw new IOException("Invalid packet ID: expect 28, but found " + packetID);
 
-        Map<String,  String> data = new HashMap<>();
+        Map<String, String> data = new HashMap<>();
         data.put("ping", String.valueOf(System.currentTimeMillis() - dataResponse.readLong())); // time
         dataResponse.readLong(); // Server GUID, ignored
 
         long magicHigh = dataResponse.readLong(); // Magic Number high bits
         if (magicHigh != MAGIC_HIGH)
             throw new IOException("Invalid Magic Number: expect 00ffff00fefefefe(high bits) , but found "
-                    + Long.toHexString(packetID));
+                                      + Long.toHexString(packetID));
 
         long magicLow = dataResponse.readLong(); // Magic Number low bits
         if (magicLow != MAGIC_LOW)
             throw new IOException("Invalid Magic Number: expect fdfdfdfd12345678(low bits) , but found "
-                    + Long.toHexString(packetID));
+                                      + Long.toHexString(packetID));
 
         String serverDesc = dataResponse.readUTF();
         String[] descSplit = serverDesc.split(";");

@@ -1,7 +1,9 @@
 package io.github.nickid2018.atribot.plugins.mcping;
 
+import com.google.common.net.HostAndPort;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.github.nickid2018.atribot.network.message.MessageChain;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -10,7 +12,7 @@ import java.net.Socket;
 /*
  * @author zh32 <zh32 at zh32.de>, modified by Nickid2018
  */
-public record MCJEServerPing(InetSocketAddress host) {
+public record MCJEServerPing(HostAndPort hostAndPort) {
 
     public static final int TIMEOUT = 10000;
 
@@ -44,6 +46,17 @@ public record MCJEServerPing(InetSocketAddress host) {
         DataOutputStream dataOutputStream;
         InputStream inputStream;
         InputStreamReader inputStreamReader;
+
+        InetSocketAddress srv = AddressResolver.resolveSRV(hostAndPort);
+        InetSocketAddress host = srv != null ? srv : new InetSocketAddress(
+            hostAndPort.getHost(),
+            hostAndPort.getPort()
+        );
+
+        if (host.getAddress() == null)
+            throw new IOException("MCPing：无法解析地址 %s".formatted(host));
+        if (host.getAddress().isLoopbackAddress())
+            throw new IOException("MCPing：由于安全设置，不能访问环回地址的MC服务器");
 
         socket.setSoTimeout(TIMEOUT);
         socket.connect(host, TIMEOUT);
@@ -99,7 +112,7 @@ public record MCJEServerPing(InetSocketAddress host) {
         if (id == -1)
             throw new IOException("Premature end of stream.");
         if (id != 0x01)
-            throw new IOException("Invalid packetID: expect 1, but found " + id);
+            throw new IOException(STR."Invalid packetID: expect 1, but found \{id}");
 
         long pingTime = dataInputStream.readLong(); // read response
 
@@ -111,6 +124,8 @@ public record MCJEServerPing(InetSocketAddress host) {
 
         JsonObject object = JsonParser.parseString(json).getAsJsonObject();
         object.addProperty("ping", System.currentTimeMillis() - pingTime);
+        if (srv != null)
+            object.addProperty("srv", STR."\{srv.getHostString()}:\{srv.getPort()}");
 
         return object;
     }
