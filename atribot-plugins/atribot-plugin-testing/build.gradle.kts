@@ -21,6 +21,7 @@ tasks.register<JavaExec>("run") {
     standardInput = System.`in`
     systemProperties["java.net.useSystemProxies"] = "true"
     environment("DEV_PLUGIN", "true")
+    jvmArgs("--enable-preview")
 }.configure {
     dependsOn(":atribot-core:classes")
 }

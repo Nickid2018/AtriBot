@@ -81,6 +81,7 @@ public class WebRendererReceiver implements CommunicateReceiver {
                 plugin.getExecutorService()
             )
             .thenApply(uri -> {
+                log.info("Put html page to {}", uri);
                 data.put("page", uri);
                 return data;
             })

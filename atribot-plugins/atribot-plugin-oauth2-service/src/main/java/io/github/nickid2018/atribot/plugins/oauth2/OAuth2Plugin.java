@@ -41,7 +41,7 @@ public class OAuth2Plugin extends AbstractAtriBotPlugin {
 
     @Override
     public void onPluginLoad() {
-        Communication.communicate("oauth2.service.started", null);
+        Communication.communicate("oauth2.service.started");
     }
 
     @Override
@@ -49,7 +49,7 @@ public class OAuth2Plugin extends AbstractAtriBotPlugin {
         server.stopServer();
         databaseManager.close();
         receiver.onPluginUnload();
-        Communication.communicate("oauth2.service.stopped", null);
+        Communication.communicate("oauth2.service.stopped");
         super.onPluginUnload();
     }
 }

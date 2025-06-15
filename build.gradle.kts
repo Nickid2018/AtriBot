@@ -105,5 +105,9 @@ subprojects {
         }
         manifest.inheritFrom(tasks.jar.get().manifest)
     }
+
+    tasks.compileJava {
+        options.compilerArgs.add("--enable-preview")
+    }
 }
 

@@ -48,7 +48,7 @@ public class ConsoleBackendListener implements NetworkListener {
             MessageChain chain = packet.getMessageChain();
             String message = chain.flatten().getMessages().stream().map(m -> switch (m) {
                 case TextMessage textMessage -> textMessage.getText();
-                case ImageMessage imageMessage -> "[Image " + imageMessage.getImgKey() + "]";
+                case ImageMessage imageMessage -> "[Image " + imageMessage.getResolved().toString().replace("file:", "file://") + "]";
                 case UnsupportedMessage ignored -> "[Unsupported]";
                 default -> "";
             }).collect(Collectors.joining());
