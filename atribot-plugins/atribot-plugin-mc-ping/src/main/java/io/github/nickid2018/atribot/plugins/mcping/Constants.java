@@ -1,6 +1,7 @@
 package io.github.nickid2018.atribot.plugins.mcping;
 
 import com.google.gson.JsonElement;
+import io.github.nickid2018.atribot.util.JsonUtil;
 
 import java.util.Map;
 import java.util.Set;
@@ -22,6 +23,15 @@ public class Constants {
         "players",
         "description",
         "favicon",
+        "ping",
+        "forgeData"
+    );
+
+    public static final Set<String> KNOWN_PROPERTIES_NO_MODS = Set.of(
+        "version",
+        "players",
+        "description",
+        "favicon",
         "ping"
     );
 
@@ -31,6 +41,12 @@ public class Constants {
         "preventsChatReports",
         element -> STR."此服务器使用NoChatReports模组，且\{element.getAsBoolean() ? "禁用" : "启用"}聊天举报功能",
         "srv",
-        element -> STR."此服务器使用SRV记录，目标地址为\{element.getAsString()}"
+        element -> STR."此服务器使用SRV记录，目标地址为\{element.getAsString()}",
+        "forgeData",
+        element -> STR."此服务器为Forge/NeoForge模组服务器，FML版本\{JsonUtil.getStringOrElse(
+            element.getAsJsonObject(),
+            "fmlNetworkVersion",
+            "未知"
+        )}"
     );
 }

@@ -15,11 +15,21 @@ import io.github.nickid2018.atribot.network.message.MessageChain;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import io.github.nickid2018.atribot.util.FunctionUtil;
 import io.github.nickid2018.atribot.util.JsonUtil;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import lombok.AllArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import net.querz.nbt.io.NBTDeserializer;
+import net.querz.nbt.io.NBTSerializer;
+import net.querz.nbt.io.NBTUtil;
+import net.querz.nbt.io.NamedTag;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
@@ -35,16 +45,22 @@ public class MCPingReceiver implements CommunicateReceiver {
     @Communicate("command.normal")
     @CommunicateFilter(key = "name", value = "mc")
     public void communicateMC(CommandCommunicateData commandData) {
-        communicateBase(commandData, false);
+        communicateBase(commandData, false, false);
+    }
+
+    @Communicate("command.normal")
+    @CommunicateFilter(key = "name", value = "mca")
+    public void communicateMCA(CommandCommunicateData commandData) {
+        communicateBase(commandData, false, true);
     }
 
     @Communicate("command.normal")
     @CommunicateFilter(key = "name", value = "mct")
     public void communicateMCT(CommandCommunicateData commandData) {
-        communicateBase(commandData, true);
+        communicateBase(commandData, true, false);
     }
 
-    public void communicateBase(CommandCommunicateData commandData, boolean isText) {
+    public void communicateBase(CommandCommunicateData commandData, boolean isText, boolean displayMods) {
         TargetData targetData = commandData.targetData;
         MessageManager manager = commandData.messageManager;
         String backend = commandData.backendID;
@@ -66,7 +82,7 @@ public class MCPingReceiver implements CommunicateReceiver {
                         sendJEPlain(addr, json, manager, backend, targetData);
                     } else {
                         Map<String, Object> data = new HashMap<>();
-                        data.put("html", prepareRenderingTemplate(json));
+                        data.put("html", prepareRenderingTemplate(json, displayMods));
                         data.put("element", "#base");
                         Communication.<byte[]>communicateWithResult(
                             "atribot-plugin-web-renderer",
@@ -237,11 +253,12 @@ public class MCPingReceiver implements CommunicateReceiver {
                    """;
     }
 
-    private String prepareOtherInfos(JsonObject json) {
+    private String prepareOtherInfos(JsonObject json, boolean displayMods) {
+        Set<String> knownProperties = displayMods ? Constants.KNOWN_PROPERTIES : Constants.KNOWN_PROPERTIES_NO_MODS;
         String desc = json
             .entrySet()
             .stream()
-            .filter(entry -> !Constants.KNOWN_PROPERTIES.contains(entry.getKey()))
+            .filter(entry -> !knownProperties.contains(entry.getKey()))
             .map(entry -> {
                 String key = entry.getKey();
                 String data = Constants.KNOWN_EXTENSIONS.containsKey(key)
@@ -262,7 +279,86 @@ public class MCPingReceiver implements CommunicateReceiver {
                      """;
     }
 
-    private String prepareRenderingTemplate(JsonObject json) {
+    @SneakyThrows
+    private String prepareForgeData(JsonObject json) {
+        JsonObject forgeData = JsonUtil.getDataInPath(json, "forgeData", JsonObject.class).orElse(null);
+        if (forgeData == null)
+            return "";
+        Map<String, String> modsMap = new HashMap<>();
+        boolean truncate;
+        if (forgeData.has("d")) {
+            ByteBuf buf = ForgeDataResolver.toBuf(forgeData.get("d").getAsString());
+            truncate = buf.readBoolean();
+            int size = buf.readUnsignedShort();
+            for (int i = 0; i < size; i++) {
+                int channelSizeAndVersionFlag = ForgeDataResolver.readVarInt(buf);
+                int channelSize = channelSizeAndVersionFlag >>> 1;
+                boolean isIgnoreServerOnly = (channelSizeAndVersionFlag & 1) != 0;
+                String modId = ForgeDataResolver.readUtf(buf);
+                String version = isIgnoreServerOnly ? "服务端不检查此模组版本" : ForgeDataResolver.readUtf(buf);
+                for (int j = 0; j < channelSize; j++) {
+                    ForgeDataResolver.readUtf(buf);
+                    ForgeDataResolver.readUtf(buf);
+                    buf.readBoolean();
+                }
+                if (modId != null && version != null)
+                    modsMap.put(modId, version);
+            }
+        } else {
+            truncate = json.has("truncate") && json.get("truncate").getAsBoolean();
+            JsonArray channels = JsonUtil.getDataInPath(forgeData, "mods", JsonArray.class).orElse(new JsonArray());
+            if (channels.isEmpty()) {
+                channels.forEach(channel -> {
+                    JsonObject channelObj = channel.getAsJsonObject();
+                    String name = JsonUtil.getStringOrNull(channelObj, "modid");
+                    String version = JsonUtil.getStringOrNull(channelObj, "version");
+                    if (name != null && version != null)
+                        modsMap.put(name, version);
+                });
+            } else {
+                channels.forEach(channel -> {
+                    JsonObject channelObj = channel.getAsJsonObject();
+                    String name = JsonUtil.getStringOrNull(channelObj, "modId");
+                    String version = JsonUtil.getStringOrNull(channelObj, "modmarker");
+                    if (name != null && version != null)
+                        modsMap.put(name, version);
+                });
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(
+            "<div style=\"text-align: center; margin-bottom: 2px; background-color: grey;\">模组数据（Forge/NeoForge），FML版本");
+        sb.append(JsonUtil.getStringInPathOrElse(forgeData, "fmlNetworkVersion", "未知"));
+        sb.append("</div>");
+        sb.append("<div style=\"display: flex; gap: 2px; flex-direction: column;\">");
+        modsMap
+            .entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> {
+                String name = entry.getKey();
+                String version = entry.getValue();
+                sb.append(STR."""
+                           <div>
+                             <span>\{name}</span>
+                             \{version.isEmpty()
+                               ? ""
+                               : STR."<span class=\"italic\" style=\"color: grey;\">(\{version})</span>"}
+                           </div>
+                           """);
+            });
+        if (truncate) {
+            sb.append(STR."""
+                          <div>
+                            <span class="italic" style="color: grey;">（仅显示了一部分）</span>
+                          </div>
+                          """);
+        }
+        sb.append("</div>");
+        return sb.toString();
+    }
+
+    private String prepareRenderingTemplate(JsonObject json, boolean displayMods) {
+        log.info(json.toString());
         String favicon = JsonUtil.getStringInPathOrElse(json, "favicon", Constants.UNKNOWN_SERVER_FAVICON);
         int onlinePlayers = JsonUtil.getIntInPathOrZero(json, "players.online");
         int maxPlayers = JsonUtil.getIntInPathOrZero(json, "players.max");
@@ -312,7 +408,7 @@ public class MCPingReceiver implements CommunicateReceiver {
                <html style="font-family: Minecraft, Unifont; background-color: #8e8e8e; color: white; image-rendering: pixelated; text-shadow: .125em .125em 0 var(--shadow-color)">
                  <div id="base" style="width: fit-content; height: fit-content; min-width: 200px; display: flex; flex-direction: column; padding: 5px; gap: 5px;">
                    <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 10px;">
-                     <img src="\{favicon}" />
+                     <img src="\{favicon}" width="64px" height="64px" />
                      <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
                        <span>Java 版服务器</span>
                        <div class="gray" style="line-height: 22px; height: 42px; overflow-y: hidden;">\{motd}</div>
@@ -327,7 +423,8 @@ public class MCPingReceiver implements CommunicateReceiver {
                      </div>
                    </div>
                    \{prepareOnlinePlayers(json)}
-                   \{prepareOtherInfos(json)}
+                   \{displayMods ? prepareForgeData(json) : ""}
+                   \{prepareOtherInfos(json, displayMods)}
                  </div>
                </html>
                """;
