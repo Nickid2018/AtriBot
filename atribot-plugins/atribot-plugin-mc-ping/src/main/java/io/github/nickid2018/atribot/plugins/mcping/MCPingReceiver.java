@@ -71,6 +71,8 @@ public class MCPingReceiver implements CommunicateReceiver {
                 return;
             }
 
+            manager.reactionMessage(backend, commandData.messageChain, "waiting");
+
             String addr = args[0];
 
             HostAndPort hostAndPort = HostAndPort.fromString(addr).withDefaultPort(25565);
