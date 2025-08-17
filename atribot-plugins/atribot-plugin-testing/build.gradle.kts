@@ -9,6 +9,7 @@ dependencies {
     api(project(":atribot-plugin-oauth2-service"))
     api(project(":atribot-plugin-permission-utils"))
     api(project(":atribot-plugin-qrcode"))
+    api(project(":atribot-plugin-server"))
     api(project(":atribot-plugin-wakatime"))
     api(project(":atribot-plugin-web-renderer"))
     api(project(":atribot-plugin-wiki"))

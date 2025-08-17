@@ -10,8 +10,7 @@ import io.github.nickid2018.atribot.util.Configuration;
 public class OAuth2Plugin extends AbstractAtriBotPlugin {
 
     public DatabaseManager databaseManager;
-    public OAuth2Server server = new OAuth2Server();
-    public OAuth2Receiver receiver = new OAuth2Receiver(this, server);
+    public OAuth2Receiver receiver = new OAuth2Receiver(this);
 
     @Override
     public PluginInfo getPluginInfo() {
@@ -36,20 +35,11 @@ public class OAuth2Plugin extends AbstractAtriBotPlugin {
             "database.oauth2",
             "database/oauth2.db"
         ));
-        server.startServer();
-    }
-
-    @Override
-    public void onPluginLoad() {
-        Communication.communicate("oauth2.service.started");
     }
 
     @Override
     public void onPluginUnload() throws Exception {
-        server.stopServer();
         databaseManager.close();
-        receiver.onPluginUnload();
-        Communication.communicate("oauth2.service.stopped");
         super.onPluginUnload();
     }
 }

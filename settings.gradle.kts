@@ -21,6 +21,7 @@ includeProject("atribot-plugin-bilibili", "atribot-plugins/atribot-plugin-bilibi
 includeProject("atribot-plugin-permission-utils", "atribot-plugins/atribot-plugin-permission-utils")
 includeProject("atribot-plugin-qrcode", "atribot-plugins/atribot-plugin-qrcode")
 includeProject("atribot-plugin-bugtracker", "atribot-plugins/atribot-plugin-bugtracker")
+includeProject("atribot-plugin-server", "atribot-plugins/atribot-plugin-server")
 
 // Backends Here
 includeProject("atribot-backend-console") // Test Console Backend

@@ -52,7 +52,7 @@ public class WakatimePlugin extends AbstractAtriBotPlugin {
             "tokenGrantURL", "https://wakatime.com/oauth/token",
             "revokeURL", "https://wakatime.com/oauth/revoke",
             "refreshTokenEnabled", true,
-            "redirect", "/wakaTimeOAuth",
+            "redirect", "/wakatime",
             "clientID", Configuration.getStringOrElse("wakatime.client_id", ""),
             "clientSecret", Configuration.getStringOrElse("wakatime.client_secret", ""),
             "uriAppend", true

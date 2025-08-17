@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 @AllArgsConstructor
 public class BilibiliReceiver implements CommunicateReceiver {
 
-    public static final Pattern B_AV_VIDEO_PATTERN = Pattern.compile("[aA][vV][1-9]\\d{0,9}");
+    public static final Pattern B_AV_VIDEO_PATTERN = Pattern.compile("[aA][vV][1-9]\\d*");
     public static final Pattern B_BV_VIDEO_PATTERN = Pattern.compile(
         "[bB][vV][fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF]{10}");
     public static final Pattern B_SHORT_LINK_PATTERN = Pattern.compile("https://b23\\.tv/[0-9a-zA-Z]+");
@@ -35,7 +35,7 @@ public class BilibiliReceiver implements CommunicateReceiver {
     private final BilibiliPlugin plugin;
 
     @Communicate("command.regex")
-    @CommunicateFilter(key = "regex", value = "[aA][vV][1-9]\\d{0,9}")
+    @CommunicateFilter(key = "regex", value = "[aA][vV][1-9]\\d*")
     @CommunicateFilter(key = "regex", value = "[bB][vV][fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF]{10}")
     @CommunicateFilter(key = "regex", value = "https://b23\\.tv/[0-9a-zA-Z]+")
     public void communicate(MessageCommunicateData messageData) {

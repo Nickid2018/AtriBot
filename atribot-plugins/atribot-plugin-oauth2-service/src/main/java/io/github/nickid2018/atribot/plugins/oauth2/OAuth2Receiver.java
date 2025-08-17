@@ -3,6 +3,7 @@ package io.github.nickid2018.atribot.plugins.oauth2;
 import com.j256.ormlite.dao.Dao;
 import io.github.nickid2018.atribot.core.communicate.Communicate;
 import io.github.nickid2018.atribot.core.communicate.CommunicateReceiver;
+import io.github.nickid2018.atribot.core.communicate.Communication;
 import io.github.nickid2018.atribot.core.message.MessageManager;
 import io.github.nickid2018.atribot.network.message.TargetData;
 import lombok.AllArgsConstructor;
@@ -15,8 +16,19 @@ import java.util.concurrent.CompletableFuture;
 public class OAuth2Receiver implements CommunicateReceiver {
 
     private final OAuth2Plugin plugin;
-    private final OAuth2Server server;
     private final Map<String, OAuth2Authenticator> authenticators = new HashMap<>();
+
+    @Communicate("server.started")
+    public void startServer() {
+        Communication.communicate("oauth2.service.started");
+    }
+
+    @Communicate("server.stopped")
+    public void stopServer() {
+        Communication.communicate("oauth2.service.stopped");
+        authenticators.values().forEach(OAuth2Authenticator::completeWaiting);
+        authenticators.clear();
+    }
 
     @Communicate("oauth2.register")
     public void registerOAuth2(Map<String, Object> data) throws SQLException {
@@ -25,7 +37,7 @@ public class OAuth2Receiver implements CommunicateReceiver {
         String tokenGrantURL = (String) data.get("tokenGrantURL");
         String revokeURL = (String) data.get("revokeURL");
         boolean refreshTokenEnabled = (boolean) data.get("refreshTokenEnabled");
-        String redirect = (String) data.get("redirect");
+        String redirect = STR."/oauth\{data.get("redirect")}";
         String clientID = (String) data.get("clientID");
         String clientSecret = (String) data.get("clientSecret");
         boolean uriAppend = (boolean) data.get("uriAppend");
@@ -44,15 +56,17 @@ public class OAuth2Receiver implements CommunicateReceiver {
             tokenDao
         );
 
-        server.addHandler(redirect, authenticator);
+        Communication.communicate("server.register", redirect, authenticator);
         authenticators.put(oauthName, authenticator);
     }
 
     @Communicate("oauth2.unregister")
     public void unregisterOAuth2(String oauthName) {
         OAuth2Authenticator authenticator = authenticators.remove(oauthName);
+        if (authenticator == null)
+            return;
         authenticator.completeWaiting();
-        server.removeHandler(authenticator.getRedirect());
+        Communication.communicate("server.unregister", authenticator.getRedirect());
     }
 
     @SuppressWarnings("unchecked")
@@ -94,9 +108,5 @@ public class OAuth2Receiver implements CommunicateReceiver {
             return CompletableFuture.failedFuture(new IllegalArgumentException("OAuth2 not registered"));
 
         return authenticator.revoke(id);
-    }
-
-    public void onPluginUnload() {
-        authenticators.values().forEach(OAuth2Authenticator::completeWaiting);
     }
 }
