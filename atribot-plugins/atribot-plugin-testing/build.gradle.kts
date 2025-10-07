@@ -16,6 +16,7 @@ dependencies {
 }
 
 tasks.register<JavaExec>("run") {
+    mkdir("../../run")
     mainClass = "io.github.nickid2018.atribot.core.AtriBotMain"
     classpath = sourceSets["main"].runtimeClasspath
     workingDir = file("../../run")
