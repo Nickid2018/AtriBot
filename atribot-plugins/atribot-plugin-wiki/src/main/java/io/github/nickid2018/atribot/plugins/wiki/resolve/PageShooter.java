@@ -48,11 +48,13 @@ public class PageShooter {
         this.url = url;
         URI uri = URI.create(url);
         this.baseURI = uri.getScheme() + "://" + uri.getHost();
-        this.sourceHTML = PAGE_SHOOTER_HTML_CACHE.get(url, () -> {
-            HttpGet get = new HttpGet(url);
-            get.addHeader("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2");
-            return WebUtil.fetchDataInText(get, WikiInfo.ATRIBOT_WIKI_PLUGIN_UA, false);
-        });
+        this.sourceHTML = PAGE_SHOOTER_HTML_CACHE.get(
+            url, () -> {
+                HttpGet get = new HttpGet(url);
+                get.addHeader("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2");
+                return WebUtil.fetchDataInText(get, WikiInfo.ATRIBOT_WIKI_PLUGIN_UA, false);
+            }
+        );
     }
 
     private CompletableFuture<byte[]> renderHTML(String data, String element, WikiEntry wikiEntry) {
@@ -132,40 +134,44 @@ public class PageShooter {
 
     public CompletableFuture<byte[]> renderFullPage(WikiPlugin plugin, WikiEntry wikiEntry) {
         return CompletableFuture
-            .supplyAsync(() -> {
-                Document doc = Jsoup.parse(sourceHTML);
-                cleanDocument(doc, Objects.requireNonNull(doc.getElementById("mw-content-text")));
-                String html = doc.html();
-                return ObjectObjectImmutablePair.of(html, null);
-            }, plugin.getExecutorService())
+            .supplyAsync(
+                () -> {
+                    Document doc = Jsoup.parse(sourceHTML);
+                    cleanDocument(doc, Objects.requireNonNull(doc.getElementById("mw-content-text")));
+                    String html = doc.html();
+                    return ObjectObjectImmutablePair.of(html, null);
+                }, plugin.getExecutorService()
+            )
             .thenCompose(data -> renderHTML(data.left(), "#mw-content-text", wikiEntry));
     }
 
     public CompletableFuture<byte[]> renderSection(WikiPlugin plugin, String page, String sectionID, WikiInfo info, WikiEntry wikiEntry) {
         return CompletableFuture
-            .supplyAsync(FunctionUtil.sneakyThrowsSupplier(() -> {
-                Document doc = Jsoup.parse(sourceHTML);
+            .supplyAsync(
+                FunctionUtil.sneakyThrowsSupplier(() -> {
+                    Document doc = Jsoup.parse(sourceHTML);
 
-                Map<String, String> parseArgs = new HashMap<>(PAGE_PARSE_HTML);
-                parseArgs.put("page", page);
-                parseArgs.put("section", sectionID);
-                parseArgs.put("sectionpreview", "true");
-                JsonObject parseSectionHTML = WebUtil.fetchDataInJson(
-                    new HttpGet(info.getApiURL() + WebUtil.formatQuery(parseArgs)),
-                    WikiInfo.ATRIBOT_WIKI_PLUGIN_UA
-                ).getAsJsonObject();
-                Objects.requireNonNull(doc.getElementById("mw-content-text"))
-                       .html(JsonUtil.getStringInPathOrElse(parseSectionHTML, "parse.text.*", ""));
-                cleanDocument(doc, Objects.requireNonNull(doc.getElementById("mw-content-text")));
+                    Map<String, String> parseArgs = new HashMap<>(PAGE_PARSE_HTML);
+                    parseArgs.put("page", page);
+                    parseArgs.put("section", sectionID);
+                    parseArgs.put("sectionpreview", "true");
+                    JsonObject parseSectionHTML = WebUtil.fetchDataInJson(
+                        new HttpGet(info.getApiURL() + WebUtil.formatQuery(parseArgs)),
+                        WikiInfo.ATRIBOT_WIKI_PLUGIN_UA
+                    ).getAsJsonObject();
+                    Objects.requireNonNull(doc.getElementById("mw-content-text"))
+                           .html(JsonUtil.getStringInPathOrElse(parseSectionHTML, "parse.text.*", ""));
+                    cleanDocument(doc, Objects.requireNonNull(doc.getElementById("mw-content-text")));
 
-                String html = doc.html();
-                return ObjectObjectImmutablePair.of(html, null);
-            }), plugin.getExecutorService())
+                    String html = doc.html();
+                    return ObjectObjectImmutablePair.of(html, null);
+                }), plugin.getExecutorService()
+            )
             .thenCompose(data -> renderHTML(data.left(), "#mw-content-text", wikiEntry));
     }
 
     private static final List<String> SUPPORT_INFOBOX = List.of(
-        "notaninfobox", "infoboxtable", "infoboxSpecial", "infotemplatebox", "infobox2",
+        "moe-infobox", "notaninfobox", "infoboxtable", "infoboxSpecial", "infotemplatebox", "infobox2",
         "tpl-infobox", "portable-infobox", "toccolours", "infobox"
     );
 
@@ -187,25 +193,27 @@ public class PageShooter {
 
     public CompletableFuture<byte[]> renderSpecials(WikiPlugin plugin, WikiEntry wikiEntry) {
         return CompletableFuture
-            .supplyAsync(() -> {
-                Document doc = Jsoup.parse(sourceHTML);
-                Element found = null;
-                String className = null;
+            .supplyAsync(
+                () -> {
+                    Document doc = Jsoup.parse(sourceHTML);
+                    Element found = null;
+                    String className = null;
 
-                for (String classNameNow : SPECIAL_RENDERS) {
-                    found = doc.getElementsByClass(classNameNow).first();
-                    className = classNameNow;
-                    if (found != null)
-                        break;
-                }
+                    for (String classNameNow : SPECIAL_RENDERS) {
+                        found = doc.getElementsByClass(classNameNow).first();
+                        className = classNameNow;
+                        if (found != null)
+                            break;
+                    }
 
-                if (found == null) {
-                    log.debug("No specials found in {}", url);
-                    return null;
-                }
+                    if (found == null) {
+                        log.debug("No specials found in {}", url);
+                        return null;
+                    }
 
-                return "." + className;
-            }, plugin.getExecutorService())
+                    return "." + className;
+                }, plugin.getExecutorService()
+            )
             .thenCompose(
                 data -> data == null
                         ? CompletableFuture.completedFuture(null)
@@ -216,28 +224,30 @@ public class PageShooter {
     public CompletableFuture<byte[]> renderWithSpecialClass(WikiPlugin plugin, WikiEntry wikiEntry,
         List<String> supportClasses, String name) {
         return CompletableFuture
-            .supplyAsync(() -> {
-                Document doc = Jsoup.parse(sourceHTML);
-                Element found = supportClasses
-                    .stream()
-                    .map(doc::getElementsByClass)
-                    .filter(Predicate.not(Elements::isEmpty))
-                    .findFirst()
-                    .map(Elements::first)
-                    .orElse(null);
+            .supplyAsync(
+                () -> {
+                    Document doc = Jsoup.parse(sourceHTML);
+                    Element found = supportClasses
+                        .stream()
+                        .map(doc::getElementsByClass)
+                        .filter(Predicate.not(Elements::isEmpty))
+                        .findFirst()
+                        .map(Elements::first)
+                        .orElse(null);
 
-                if (found == null) {
-                    log.debug("No {} found in {}", name, url);
-                    return null;
-                }
+                    if (found == null) {
+                        log.debug("No {} found in {}", name, url);
+                        return null;
+                    }
 
-                String className = "%s-render-%s".formatted(name, RandomStringUtils.random(32, true, true));
-                found.addClass(className);
-                cleanDocument(doc, found);
+                    String className = "%s-render-%s".formatted(name, RandomStringUtils.random(32, true, true));
+                    found.addClass(className);
+                    cleanDocument(doc, found);
 
-                String html = doc.html();
-                return ObjectObjectImmutablePair.of(html, "." + className);
-            }, plugin.getExecutorService())
+                    String html = doc.html();
+                    return ObjectObjectImmutablePair.of(html, "." + className);
+                }, plugin.getExecutorService()
+            )
             .thenCompose(
                 data -> data == null
                         ? CompletableFuture.completedFuture(null)
