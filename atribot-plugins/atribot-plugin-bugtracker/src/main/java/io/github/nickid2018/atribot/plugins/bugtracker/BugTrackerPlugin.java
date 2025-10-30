@@ -15,7 +15,11 @@ import io.github.nickid2018.atribot.network.message.TextMessage;
 import io.github.nickid2018.atribot.util.JsonUtil;
 import io.github.nickid2018.atribot.util.WebUtil;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -26,6 +30,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @SuppressWarnings("unused")
+@Slf4j
 public class BugTrackerPlugin extends AbstractAtriBotPlugin implements CommunicateReceiver {
     @Override
     public PluginInfo getPluginInfo() {
@@ -61,6 +66,7 @@ public class BugTrackerPlugin extends AbstractAtriBotPlugin implements Communica
                     commandCommunicateData.targetData,
                     MessageChain.text("BugTracker：发生错误，错误报告如下：\n" + t.getMessage())
                 );
+                log.error("BugTracker Query failed on {}", commandCommunicateData.commandArgs[0], t);
                 return null;
             });
     }
@@ -92,24 +98,30 @@ public class BugTrackerPlugin extends AbstractAtriBotPlugin implements Communica
                         messageCommunicateData.targetData,
                         MessageChain.text("BugTracker：发生错误，错误报告如下：\n" + t.getMessage())
                     );
+                    log.error("BugTracker Query failed on {}", match, t);
                     return null;
                 });
         }
     }
 
-    public static final String MOJIRA_API_URL = "https://bugs.mojang.com/rest/api/2/issue/";
+    public static final String MOJIRA_API_URL = "https://bugs.mojang.com/api/jql-search-post";
 
     @SneakyThrows
     public void analyzeBug(MessageManager messageManager, TargetData target, String backend, String searchBug) {
-        HttpGet get = new HttpGet(MOJIRA_API_URL + searchBug);
-        JsonObject data = WebUtil.fetchDataInJson(get).getAsJsonObject();
-        if (data.has("errorMessage"))
-            throw new RuntimeException(data.get("errorMessage").getAsString());
+        HttpPost post = new HttpPost(MOJIRA_API_URL);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("advanced", true);
+        payload.addProperty("project", searchBug.split("-")[0]);
+        payload.addProperty("search", "key = " + searchBug);
+        payload.addProperty("maxResults", 1);
+        post.setEntity(new StringEntity(payload.toString(), ContentType.APPLICATION_JSON));
+        JsonObject issueData = WebUtil.fetchDataInJson(post).getAsJsonObject();
+        JsonArray issues = issueData.getAsJsonArray("issues");
+        if (issues.isEmpty())
+            throw new IOException("无法获取JSON文本，可能是该漏洞报告被删除或无权访问");
+        JsonObject data = issues.get(0).getAsJsonObject();
 
         JsonObject fields = data.getAsJsonObject("fields");
-        if (fields == null)
-            throw new IOException("无法获取JSON文本，可能是该漏洞报告被删除或无权访问");
-
         String title = JsonUtil.getStringOrNull(data, "key") + ": " + JsonUtil.getStringOrNull(fields, "summary");
         String project = JsonUtil.getStringInPathOrNull(fields, "project.name");
         String created = JsonUtil.getStringOrNull(fields, "created");
@@ -136,14 +148,14 @@ public class BugTrackerPlugin extends AbstractAtriBotPlugin implements Communica
         String versions = JsonUtil.getData(fields, "versions", JsonArray.class).map(versionsArray -> {
             if (versionsArray.size() == 1) {
                 JsonObject versionRoot = versionsArray.get(0).getAsJsonObject();
-                return JsonUtil.getStringOrNull(versionRoot, "name") + "("
+                return JsonUtil.getStringOrNull(versionRoot, "name") + " ("
                     + JsonUtil.getStringOrNull(versionRoot, "releaseDate") + ")";
             } else {
                 JsonObject versionRoot1 = versionsArray.get(0).getAsJsonObject();
                 JsonObject versionRoot2 = versionsArray.get(versionsArray.size() - 1).getAsJsonObject();
-                return JsonUtil.getStringOrNull(versionRoot1, "name") + "("
+                return JsonUtil.getStringOrNull(versionRoot1, "name") + " ("
                     + JsonUtil.getStringOrNull(versionRoot1, "releaseDate") + ") ~ " +
-                    JsonUtil.getStringOrNull(versionRoot2, "name") + "("
+                    JsonUtil.getStringOrNull(versionRoot2, "name") + " ("
                     + JsonUtil.getStringOrNull(versionRoot2, "releaseDate") + ")";
             }
         }).orElse(null);
@@ -190,8 +202,9 @@ public class BugTrackerPlugin extends AbstractAtriBotPlugin implements Communica
             "atribot-plugin-web-renderer",
             "webrenderer.render_page_element",
             Map.of(
-                "page", "https://bugs.mojang.com/browse/" + searchBug,
-                "element", "#descriptionmodule"
+                "page", "https://mojira.dev/" + searchBug,
+                "element", ".issue-body",
+                "post-script","document.getElementsByTagName('header')[0].remove()"
             )
         ).thenComposeAsync(image -> {
              if (image == null)

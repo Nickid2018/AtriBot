@@ -3,6 +3,7 @@ version = "1.0-SNAPSHOT"
 
 dependencies {
     api(project(":atribot-core"))
+    api(project(":atribot-plugin-bugtracker"))
     api(project(":atribot-plugin-bilibili"))
     api(project(":atribot-plugin-command"))
     api(project(":atribot-plugin-mc-ping"))

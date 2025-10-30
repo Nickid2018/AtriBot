@@ -60,6 +60,11 @@ public class WebRendererReceiver implements CommunicateReceiver {
                 }
                 log.debug("Page {} loaded", page);
 
+                String script = (String) data.get("post-script");
+                if (script != null) {
+                    driver.executeScript(script);
+                }
+
                 By element = By.cssSelector(elementSelector);
                 WebElement webElement = driver.findElement(element);
                 return webElement.getScreenshotAs(OutputType.BYTES);
