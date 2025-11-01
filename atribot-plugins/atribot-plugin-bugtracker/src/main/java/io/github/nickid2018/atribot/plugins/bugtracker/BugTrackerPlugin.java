@@ -108,94 +108,102 @@ public class BugTrackerPlugin extends AbstractAtriBotPlugin implements Communica
 
     @SneakyThrows
     public void analyzeBug(MessageManager messageManager, TargetData target, String backend, String searchBug) {
-        HttpPost post = new HttpPost(MOJIRA_API_URL);
-        JsonObject payload = new JsonObject();
-        payload.addProperty("advanced", true);
-        payload.addProperty("project", searchBug.split("-")[0]);
-        payload.addProperty("search", "key = " + searchBug);
-        payload.addProperty("maxResults", 1);
-        post.setEntity(new StringEntity(payload.toString(), ContentType.APPLICATION_JSON));
-        JsonObject issueData = WebUtil.fetchDataInJson(post).getAsJsonObject();
-        JsonArray issues = issueData.getAsJsonArray("issues");
-        if (issues.isEmpty())
-            throw new IOException("无法获取JSON文本，可能是该漏洞报告被删除或无权访问");
-        JsonObject data = issues.get(0).getAsJsonObject();
-
-        JsonObject fields = data.getAsJsonObject("fields");
-        String title = JsonUtil.getStringOrNull(data, "key") + ": " + JsonUtil.getStringOrNull(fields, "summary");
-        String project = JsonUtil.getStringInPathOrNull(fields, "project.name");
-        String created = JsonUtil.getStringOrNull(fields, "created");
-        String status = JsonUtil.getStringInPathOrNull(fields, "status.name");
-        String subStatus = JsonUtil.getStringInPathOrNull(fields, "customfield_10500.value");
-        String resolution = JsonUtil.getStringInPathOrNull(fields, "resolution.name");
-        String mojangPriority = JsonUtil.getStringInPathOrNull(fields, "customfield_12200.value");
-
-        if (resolution == null)
-            resolution = "Unresolved";
-        if (resolution.equals("Duplicate")) {
-            JsonArray issueLinks = fields.getAsJsonArray("issuelinks");
-            for (JsonElement element : issueLinks) {
-                JsonObject issue = element.getAsJsonObject();
-                String type = JsonUtil.getStringInPathOrNull(issue, "type.name");
-                String outwardIssue = JsonUtil.getStringInPathOrNull(issue, "outwardIssue.key");
-                if (type != null && outwardIssue != null && type.equals("Duplicate")) {
-                    resolution += "（与" + outwardIssue + "重复）";
-                    break;
-                }
-            }
+        JsonObject issueData = null;
+        try {
+            HttpPost post = new HttpPost(MOJIRA_API_URL);
+            JsonObject payload = new JsonObject();
+            payload.addProperty("advanced", true);
+            payload.addProperty("project", searchBug.split("-")[0]);
+            payload.addProperty("search", "key = " + searchBug);
+            payload.addProperty("maxResults", 1);
+            post.setEntity(new StringEntity(payload.toString(), ContentType.APPLICATION_JSON));
+            issueData = WebUtil.fetchDataInJson(post).getAsJsonObject();
+        } catch (Exception e) {
+            messageManager.sendMessage(backend, target, MessageChain.text("Mojira API不稳定，未能返回信息"));
         }
 
-        String versions = JsonUtil.getData(fields, "versions", JsonArray.class).map(versionsArray -> {
-            if (versionsArray.size() == 1) {
-                JsonObject versionRoot = versionsArray.get(0).getAsJsonObject();
-                return JsonUtil.getStringOrNull(versionRoot, "name") + " ("
-                    + JsonUtil.getStringOrNull(versionRoot, "releaseDate") + ")";
-            } else {
-                JsonObject versionRoot1 = versionsArray.get(0).getAsJsonObject();
-                JsonObject versionRoot2 = versionsArray.get(versionsArray.size() - 1).getAsJsonObject();
-                return JsonUtil.getStringOrNull(versionRoot1, "name") + " ("
-                    + JsonUtil.getStringOrNull(versionRoot1, "releaseDate") + ") ~ " +
-                    JsonUtil.getStringOrNull(versionRoot2, "name") + " ("
-                    + JsonUtil.getStringOrNull(versionRoot2, "releaseDate") + ")";
+        if (issueData != null) {
+            JsonArray issues = issueData.getAsJsonArray("issues");
+            if (issues.isEmpty())
+                throw new IOException("无法获取JSON文本，可能是该漏洞报告被删除或无权访问");
+            JsonObject data = issues.get(0).getAsJsonObject();
+
+            JsonObject fields = data.getAsJsonObject("fields");
+            String title = JsonUtil.getStringOrNull(data, "key") + ": " + JsonUtil.getStringOrNull(fields, "summary");
+            String project = JsonUtil.getStringInPathOrNull(fields, "project.name");
+            String created = JsonUtil.getStringOrNull(fields, "created");
+            String status = JsonUtil.getStringInPathOrNull(fields, "status.name");
+            String subStatus = JsonUtil.getStringInPathOrNull(fields, "customfield_10500.value");
+            String resolution = JsonUtil.getStringInPathOrNull(fields, "resolution.name");
+            String mojangPriority = JsonUtil.getStringInPathOrNull(fields, "customfield_12200.value");
+
+            if (resolution == null)
+                resolution = "Unresolved";
+            if (resolution.equals("Duplicate")) {
+                JsonArray issueLinks = fields.getAsJsonArray("issuelinks");
+                for (JsonElement element : issueLinks) {
+                    JsonObject issue = element.getAsJsonObject();
+                    String type = JsonUtil.getStringInPathOrNull(issue, "type.name");
+                    String outwardIssue = JsonUtil.getStringInPathOrNull(issue, "outwardIssue.key");
+                    if (type != null && outwardIssue != null && type.equals("Duplicate")) {
+                        resolution += "（与" + outwardIssue + "重复）";
+                        break;
+                    }
+                }
             }
-        }).orElse(null);
 
-        String finalResolution = resolution;
-        String fixVersion = JsonUtil.getData(fields, "fixVersions", JsonArray.class).map(fixArray -> {
-            if (!fixArray.isEmpty()) {
-                JsonObject lastFix = fixArray.get(fixArray.size() - 1).getAsJsonObject();
-                String ret = JsonUtil.getStringOrNull(lastFix, "name") + "("
-                    + JsonUtil.getStringOrNull(lastFix, "releaseDate") + ")";
-                if (!finalResolution.equals("Resolved") && !finalResolution.equals("Fixed"))
-                    ret += "（尝试修复）";
-                if (fixArray.size() > 1)
-                    ret += "（仅显示最后一次修复）";
-                return ret;
-            } else
-                return null;
-        }).orElse(null);
+            String versions = JsonUtil.getData(fields, "versions", JsonArray.class).map(versionsArray -> {
+                if (versionsArray.size() == 1) {
+                    JsonObject versionRoot = versionsArray.get(0).getAsJsonObject();
+                    return JsonUtil.getStringOrNull(versionRoot, "name") + " ("
+                        + JsonUtil.getStringOrNull(versionRoot, "releaseDate") + ")";
+                } else {
+                    JsonObject versionRoot1 = versionsArray.get(0).getAsJsonObject();
+                    JsonObject versionRoot2 = versionsArray.get(versionsArray.size() - 1).getAsJsonObject();
+                    return JsonUtil.getStringOrNull(versionRoot1, "name") + " ("
+                        + JsonUtil.getStringOrNull(versionRoot1, "releaseDate") + ") ~ " +
+                        JsonUtil.getStringOrNull(versionRoot2, "name") + " ("
+                        + JsonUtil.getStringOrNull(versionRoot2, "releaseDate") + ")";
+                }
+            }).orElse(null);
 
-        StringBuilder builder = new StringBuilder(title).append("\n");
-        if (project != null)
-            builder.append("项目: ").append(project).append("\n");
-        if (created != null)
-            builder.append("创建时间: ").append(created).append("\n");
-        if (versions != null)
-            builder.append("影响版本: ").append(versions).append("\n");
-        builder.append("目前状态: ");
-        if (subStatus != null)
-            builder.append(subStatus);
-        if (status != null)
-            builder.append("[").append(status).append("]");
-        builder.append("\n");
-        builder.append("目前解决状态: ").append(resolution).append("\n");
-        if (fixVersion != null)
-            builder.append("修复版本: ").append(fixVersion).append("\n");
-        if (mojangPriority != null)
-            builder.append("Mojang优先级: ").append(mojangPriority).append("\n");
-        builder.append("主条目URL: https://bugs.mojang.com/browse/").append(searchBug).append("\n");
+            String finalResolution = resolution;
+            String fixVersion = JsonUtil.getData(fields, "fixVersions", JsonArray.class).map(fixArray -> {
+                if (!fixArray.isEmpty()) {
+                    JsonObject lastFix = fixArray.get(fixArray.size() - 1).getAsJsonObject();
+                    String ret = JsonUtil.getStringOrNull(lastFix, "name") + "("
+                        + JsonUtil.getStringOrNull(lastFix, "releaseDate") + ")";
+                    if (!finalResolution.equals("Resolved") && !finalResolution.equals("Fixed"))
+                        ret += "（尝试修复）";
+                    if (fixArray.size() > 1)
+                        ret += "（仅显示最后一次修复）";
+                    return ret;
+                } else
+                    return null;
+            }).orElse(null);
 
-        messageManager.sendMessage(backend, target, MessageChain.text(builder.toString()));
+            StringBuilder builder = new StringBuilder(title).append("\n");
+            if (project != null)
+                builder.append("项目: ").append(project).append("\n");
+            if (created != null)
+                builder.append("创建时间: ").append(created).append("\n");
+            if (versions != null)
+                builder.append("影响版本: ").append(versions).append("\n");
+            builder.append("目前状态: ");
+            if (subStatus != null)
+                builder.append(subStatus);
+            if (status != null)
+                builder.append("[").append(status).append("]");
+            builder.append("\n");
+            builder.append("目前解决状态: ").append(resolution).append("\n");
+            if (fixVersion != null)
+                builder.append("修复版本: ").append(fixVersion).append("\n");
+            if (mojangPriority != null)
+                builder.append("Mojang优先级: ").append(mojangPriority).append("\n");
+            builder.append("主条目URL: https://bugs.mojang.com/browse/").append(searchBug).append("\n");
+
+            messageManager.sendMessage(backend, target, MessageChain.text(builder.toString()));
+        }
 
         Communication.
             <byte[]>communicateWithResult(
